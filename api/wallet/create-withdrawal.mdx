@@ -1,7 +1,7 @@
 ---
 title: "POST /wallet/withdraw — Create a Polygon Withdrawal"
 sidebarTitle: "Create Withdrawal"
-description: "Initiate a USDC/USDT/PUSD withdrawal to a Polygon address. Requires TOTP, a mandatory Idempotency-Key, and wallet_status=ready."
+description: "Initiate a USDC, USDC.e, USDT, or PUSD withdrawal to a Polygon address. Requires TOTP verification and a mandatory Idempotency-Key header."
 ---
 
 Use this endpoint to withdraw tokens from your custodial wallet to an external Polygon address. Each withdrawal request must include a valid TOTP code and a mandatory `Idempotency-Key` header. You must authenticate with a key that carries the `withdraw:create` scope.

@@ -1,7 +1,7 @@
 ---
 title: "GET /afk/strategies — List AFK Trading Strategies"
 sidebarTitle: "List Strategies"
-description: "Retrieve all AFK automated trading strategies owned by your account. Each strategy defines automated trade rules including market, direction, and risk parameters."
+description: "Retrieve all AFK automated trading strategies for your account. Each strategy encodes trade rules: market, direction, price filters, and risk controls."
 ---
 
 This endpoint returns all AFK automated trading strategies owned by your account. AFK strategies execute trades automatically based on the rules you define — market filters, price ranges, technical indicators, and profit/loss triggers. You can use the returned `config_id` values to retrieve, update, or review execution records for individual strategies. Requires the `afk:read` scope.

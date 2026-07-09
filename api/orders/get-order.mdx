@@ -1,10 +1,10 @@
 ---
-title: "GET /orders/{order_id} — Get Order Details"
+title: "Get Order Details by ID — GET /orders/{order_id}"
 sidebarTitle: "Get Order"
-description: "Retrieve a single order by its master order ID. Returns ORDER_NOT_FOUND if the order does not exist or belongs to another account."
+description: "Retrieve full details for a single order by ID. Returns ORDER_NOT_FOUND if the order does not exist or belongs to another account."
 ---
 
-Use this endpoint to retrieve the full details of a single order by its master order ID. If the order does not exist, or if it belongs to a different account than the one authenticated by your API key, the response returns an `ORDER_NOT_FOUND` error. This endpoint requires the `trade:read` scope.
+Use this endpoint to retrieve the full details of a single order by its ID. If the order does not exist, or if it belongs to a different account than the one authenticated by your API key, the response returns an `ORDER_NOT_FOUND` error. This endpoint requires the `trade:read` scope.
 
 ## Request
 
@@ -28,7 +28,7 @@ All requests must include the following HMAC-signed headers:
 ### Path Parameters
 
 <ParamField path="order_id" type="string" required>
-  The master order ID of the order you want to retrieve (e.g., `0xorder_id_here`).
+  The unique order ID of the order you want to retrieve (e.g., `0xorder_id_here`).
 </ParamField>
 
 ### Query Parameters

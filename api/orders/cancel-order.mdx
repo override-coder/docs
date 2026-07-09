@@ -1,10 +1,10 @@
 ---
-title: "DELETE /orders/{order_id} — Cancel an Order"
+title: "Cancel an Open Order — DELETE /orders/{order_id}"
 sidebarTitle: "Cancel Order"
 description: "Request cancellation of an open order by its ID. Returns cancel_requested status; the order may still fill before the cancel is processed."
 ---
 
-This endpoint submits a cancellation request for an open order identified by its master order ID. Cancellation is asynchronous — the server accepts and queues the cancel request, but the order may still be filled before the cancellation is processed. A successful response confirms only that the cancel was accepted, not that the order has been canceled. This endpoint requires the `trade:cancel` scope. You may optionally supply an `Idempotency-Key` header to make the request safely retriable.
+This endpoint submits a cancellation request for an open order identified by its order ID. Cancellation is asynchronous — the server accepts and queues the cancel request, but the order may still be filled before the cancellation is processed. A successful response confirms only that the cancel was accepted, not that the order has been canceled. This endpoint requires the `trade:cancel` scope. You may optionally supply an `Idempotency-Key` header to make the request safely retriable.
 
 ## Request
 
@@ -34,7 +34,7 @@ All requests must include the following HMAC-signed headers:
 ### Path Parameters
 
 <ParamField path="order_id" type="string" required>
-  The master order ID of the order you want to cancel (e.g., `0xorder_id_here`).
+  The unique order ID of the order you want to cancel (e.g., `0xorder_id_here`).
 </ParamField>
 
 ## Response
@@ -52,6 +52,13 @@ All responses use the standard envelope. On success, the `data` object contains 
 <Note>
   A `status` of `cancel_requested` means the cancellation was **accepted**, not that the order is already canceled. Because cancellation is asynchronous, the order may still fill before the cancel is processed. Poll `GET /orders/{order_id}` to confirm the final status of the order.
 </Note>
+
+## Error Codes
+
+| Code | Description |
+|---|---|
+| `ORDER_CANCEL_FAILED` | The cancellation request could not be submitted due to an internal or exchange-side error. |
+| `ORDER_NOT_FOUND` | No order was found with the given ID, or the order belongs to a different account. |
 
 ## Example
 

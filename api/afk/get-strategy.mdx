@@ -1,7 +1,7 @@
 ---
 title: "GET /afk/strategies/{strategy_id} — Get AFK Strategy"
 sidebarTitle: "Get Strategy"
-description: "Retrieve a single AFK automated trading strategy by its ID. Returns NOT_FOUND if the strategy does not belong to your account."
+description: "Retrieve a single AFK automated trading strategy by its ID. Returns NOT_FOUND if the strategy does not exist or belong to your account."
 ---
 
 Retrieve a single AFK strategy by its ID. This endpoint returns the full strategy configuration including all price filters, risk parameters, and technical indicator settings. If the strategy does not exist or belongs to a different account, the response will contain `"code": "NOT_FOUND"`. Requires the `afk:read` scope.

@@ -1,6 +1,6 @@
 ---
-title: "POST /partner/users/{user_account_id}/api-keys — Create User API Key"
-sidebarTitle: "Create User API Key"
+title: "Create User API Key — POST /partner/users/{id}/api-keys"
+sidebarTitle: "Create API Key"
 description: "Create an API key for a provisioned partner user. The key secret is returned once and cannot be retrieved again. Requires wallet_status=ready."
 ---
 
@@ -117,6 +117,7 @@ curl -X POST "https://test-eu.polycopy.fun/openapi/v1/partner/users/998765432109
     "scopes": ["trade:order", "wallet:read"],
     "ip_whitelist": [],
     "secret": "sk_supersecretvalue",
+    "last_used_at": null,
     "created_at": "2024-06-01T12:00:00Z"
   },
   "request_id": "req_202606011200000001"

@@ -1,7 +1,7 @@
 ---
-title: "PATCH /copytrade/configs/{config_id} — Update Copytrade Config"
+title: "PATCH /copytrade/configs/{config_id} — Update Config"
 sidebarTitle: "Update Config"
-description: "Update fields on an existing copytrade configuration. All fields are optional; omitted fields are unchanged. Boolean fields represent the desired final state."
+description: "Partially update a copytrade configuration. Omitted fields are unchanged. Boolean fields represent the desired final state, not a toggle."
 ---
 
 Use this endpoint to update one or more fields on an existing copytrade configuration. All request body fields are optional — only send the fields you want to change. Fields you omit are left at their current values. Requires the `copytrade:manage` scope. You may optionally supply an `Idempotency-Key` header to safely retry the request.
