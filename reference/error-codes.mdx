@@ -56,16 +56,16 @@ These codes cover problems with your API key credentials or the HMAC signature y
   implementations.
 </Warning>
 
-## TOTP errors
+## 2FA errors
 
 These codes are returned by endpoints that require two-factor authentication (withdrawal, for example).
 
 | Code | HTTP | Meaning | Recommended action |
 |---|---|---|---|
-| `TOTP_NOT_ENABLED` | 403 | Your account does not have TOTP configured | Complete TOTP setup outside this API before making withdrawal requests |
-| `TOTP_CODE_INVALID` | 403 | The TOTP code you provided is incorrect | Provide a valid current 6-digit TOTP code |
-| `TOTP_CODE_REPLAYED` | 403 | This TOTP code has already been used | Wait for the next 30-second TOTP window and provide a fresh code |
-| `TOTP_TOO_MANY_FAILURES` | 403 | Too many consecutive TOTP failures | Wait before retrying to avoid a temporary lockout |
+| `TWO_FA_NOT_ENABLED` | 403 | Your account does not have 2FA configured | Complete 2FA setup before making withdrawal requests |
+| `TWO_FA_CODE_INVALID` | 403 | The 2FA code you provided is incorrect | Provide a valid current 6-digit 2FA code |
+| `TWO_FA_CODE_REPLAYED` | 409 | This 2FA code has already been used | Wait for the next 30-second 2FA window and provide a fresh code |
+| `TWO_FA_TOO_MANY_FAILURES` | 429 | Too many consecutive 2FA failures | Wait before retrying to avoid a temporary lockout |
 
 ## Order errors
 
@@ -91,7 +91,7 @@ These codes are returned by wallet withdrawal endpoints.
 
 | Code | HTTP | Meaning | Recommended action |
 |---|---|---|---|
-| `WITHDRAW_2FA_REQUIRED` | 403 | TOTP verification is required for withdrawals | Include a valid `totp_code` field in your request body |
+| `WITHDRAW_2FA_REQUIRED` | 403 | 2FA verification is required for withdrawals | Include a valid `2fa` field in your request body |
 | `WITHDRAW_NETWORK_UNSUPPORTED` | 422 | The specified network is not supported | Only Polygon (`polygon`) is supported in v1 |
 | `WITHDRAW_TOKEN_UNSUPPORTED` | 422 | The token contract address is not supported | Use one of the four supported token contract addresses listed in the API reference |
 | `WITHDRAW_ADDRESS_INVALID` | 422 | The destination address is not a valid Polygon address | Verify the address format (EIP-55 checksummed or lowercase hex) |

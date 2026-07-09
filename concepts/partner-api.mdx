@@ -80,7 +80,7 @@ The response includes the user API key. The `secret` is shown only once.
 
 If `scopes` is omitted, PolyCop grants the default user scopes: `trade:read`, `trade:order`, `trade:cancel`, `wallet:read`, `positions:read`, `copytrade:read`, `copytrade:manage`, `afk:read`, and `afk:manage`.
 
-User API keys cannot use the wildcard `*` scope. `withdraw:create` is not supported for partner user API keys in v1 because withdrawals require account-level TOTP.
+User API keys cannot use the wildcard `*` scope. `withdraw:create` is not supported for partner user API keys in v1 because withdrawals require account-level 2FA.
 
 ## Revoke a user API key
 

@@ -12,8 +12,8 @@ info:
     Core constraints:
     - Custodial wallet only.
     - API key requests use HMAC-SHA256 signatures.
-    - API key trading does not require TOTP.
-    - Withdraw requires TOTP and only supports Polygon in v1.
+    - API key trading does not require 2FA.
+    - Withdraw requires 2FA and only supports Polygon in v1.
     - `openapi_account_id` is public; `master_telegram_id` is internal.
     - This is not a Polymarket CLOB-compatible API.
 servers:
@@ -84,7 +84,7 @@ paths:
       parameters:
       - "$ref": "#/components/parameters/RequiredIdempotencyKey"
       description: |
-        API key signed request. Withdraw requires TOTP, Idempotency-Key, and only supports Polygon in v1.
+        API key signed request. Withdraw requires 2FA, Idempotency-Key, and only supports Polygon in v1.
         `Idempotency-Key` is mandatory for this endpoint. It identifies one business withdrawal request.
         Client retries after timeout or network failure must reuse the same `Idempotency-Key` and
         exactly the same JSON body; each retry still needs a fresh `X-Timestamp`, `X-Nonce`, and
@@ -339,7 +339,7 @@ paths:
         Create a copytrade configuration for the account represented by the API key.
 
         This endpoint is included in v1. It requires API key HMAC signature and
-        does not require TOTP. The openapi service creates the config for the
+        does not require 2FA. The openapi service creates the config for the
         trading account represented by the API key.
       operationId: createCopytradeConfig
       parameters:
@@ -1280,10 +1280,10 @@ components:
       - API_KEY_SIGNATURE_INVALID
       - API_KEY_TIMESTAMP_EXPIRED
       - API_KEY_NONCE_REPLAYED
-      - TOTP_NOT_ENABLED
-      - TOTP_CODE_INVALID
-      - TOTP_CODE_REPLAYED
-      - TOTP_TOO_MANY_FAILURES
+      - TWO_FA_NOT_ENABLED
+      - TWO_FA_CODE_INVALID
+      - TWO_FA_CODE_REPLAYED
+      - TWO_FA_TOO_MANY_FAILURES
       - ORDER_PLACE_FAILED
       - ORDER_CANCEL_FAILED
       - ORDER_NOT_FOUND
@@ -1523,7 +1523,7 @@ components:
             `copytrade:read`, `copytrade:manage`, `afk:read`, or `afk:manage`.
 
             `withdraw:create` is not supported for partner user API keys in V1 because withdrawals
-            require account-level TOTP. To enable this permission later, first add a partner-user TOTP binding flow,
+            require account-level 2FA. To enable this permission later, first add a partner-user 2FA binding flow,
             then add `withdraw:create` to the allowed partner user key scopes.
           items:
             type: string
@@ -1598,7 +1598,7 @@ components:
       - token
       - amount
       - destination
-      - totp_code
+      - 2fa
       properties:
         network:
           "$ref": "#/components/schemas/Network"
@@ -1621,7 +1621,7 @@ components:
         destination:
           type: string
           example: '0x0000000000000000000000000000000000000000'
-        totp_code:
+        2fa:
           type: string
           minLength: 6
           maxLength: 6
