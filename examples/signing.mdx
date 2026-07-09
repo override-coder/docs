@@ -1,10 +1,10 @@
 ---
 title: "Request Signing Examples: TypeScript, Python, cURL"
 sidebarTitle: "Signing Examples"
-description: "Copy-paste HMAC-SHA256 signing implementations for Poly Trader OpenAPI in TypeScript, Python, and cURL with a complete working example."
+description: "Copy-paste HMAC-SHA256 signing implementations for PolyCop OpenAPI in TypeScript, Python, and cURL with a complete working example."
 ---
 
-Every authenticated request to the Poly Trader OpenAPI requires you to build a canonical string from the request's method, path, query, timestamp, nonce, and body hash — then sign it with your secret using HMAC-SHA256 to produce the `X-Signature` header. The examples below show you exactly how to do that in TypeScript/Node.js, Python, and cURL (bash). All three examples target the same `GET /wallet` endpoint so you can compare them side-by-side.
+Every authenticated request to the PolyCop OpenAPI requires you to build a canonical string from the request's method, path, query, timestamp, nonce, and body hash — then sign it with your secret using HMAC-SHA256 to produce the `X-Signature` header. The examples below show you exactly how to do that in TypeScript/Node.js, Python, and cURL (bash). All three examples target the same `GET /wallet` endpoint so you can compare them side-by-side.
 
 ## TypeScript / Node.js
 
@@ -39,7 +39,7 @@ function sign(
 }
 
 /**
- * Make an authenticated request to the Poly Trader OpenAPI.
+ * Make an authenticated request to the PolyCop OpenAPI.
  *
  * @param keyId    Your API key ID  (X-API-Key header)
  * @param secret   Your API secret  (used to sign the request)
@@ -138,7 +138,7 @@ def api_request(
     params: dict | None = None,
     body: dict | None = None,
 ):
-    """Make an authenticated request to the Poly Trader OpenAPI."""
+    """Make an authenticated request to the PolyCop OpenAPI."""
     query = urlencode(params) if params else ''
     body_str = json.dumps(body, separators=(',', ':')) if body else ''
     url = f'{BASE_URL}{endpoint}' + (f'?{query}' if query else '')

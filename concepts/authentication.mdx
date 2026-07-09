@@ -1,14 +1,14 @@
 ---
 title: "Authenticate API Requests with HMAC-SHA256 Signing"
 sidebarTitle: "Authentication"
-description: "Every Poly Trader OpenAPI request requires four signed headers. Learn the canonical string format, timestamp skew rules, and nonce requirements."
+description: "Every PolyCop OpenAPI request requires four signed headers. Learn the canonical string format, timestamp skew rules, and nonce requirements."
 ---
 
-All Poly Trader OpenAPI requests are authenticated using your **API Key** combined with an **HMAC-SHA256 signature**. There is no session-based login — every HTTP request must include four signed headers that prove both your identity and the integrity of the request at the time it was made. This approach prevents replay attacks, man-in-the-middle tampering, and credential leakage.
+All PolyCop OpenAPI requests are authenticated using your **API Key** combined with an **HMAC-SHA256 signature**. There is no session-based login — every HTTP request must include four signed headers that prove both your identity and the integrity of the request at the time it was made. This approach prevents replay attacks, man-in-the-middle tampering, and credential leakage.
 
 ## Required headers
 
-Every request to the Poly Trader OpenAPI must include the following four HTTP headers:
+Every request to the PolyCop OpenAPI must include the following four HTTP headers:
 
 <ParamField header="X-API-Key" type="string" required>
   Your API key ID, in the format `pk_...`. This identifies which key is being

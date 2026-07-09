@@ -1,6 +1,6 @@
 {
   "$schema": "https://mintlify.com/docs.json",
-  "name": "Poly Trader OpenAPI",
+  "name": "PolyCop OpenAPI",
   "theme": "luma",
   "colors": {
     "primary": "#ef7025",

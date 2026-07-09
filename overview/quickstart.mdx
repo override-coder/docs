@@ -1,10 +1,10 @@
 ---
-title: "Poly Trader OpenAPI Quickstart: Sign and Call the API"
+title: "PolyCop OpenAPI Quickstart: Sign and Call the API"
 sidebarTitle: "Quickstart"
 description: "Get an API key, build an HMAC-SHA256 signature, and make your first authenticated GET /wallet request in minutes with this step-by-step guide."
 ---
 
-This guide walks you through the minimum steps needed to authenticate with Poly Trader OpenAPI and make your first successful request. By the end you will have obtained an API key, signed a request using HMAC-SHA256, and retrieved your wallet details from `GET /wallet`.
+This guide walks you through the minimum steps needed to authenticate with PolyCop OpenAPI and make your first successful request. By the end you will have obtained an API key, signed a request using HMAC-SHA256, and retrieved your wallet details from `GET /wallet`.
 
 <Steps>
 
@@ -12,7 +12,7 @@ This guide walks you through the minimum steps needed to authenticate with Poly 
 
 API keys come in two levels: partner keys and user-level keys.
 
-- **Partner key** — Contact your Poly Trader partner manager to receive a partner API key. This key lets you perform partner-level operations, including provisioning users and creating user-level keys on their behalf.
+- **Partner key** — Contact your PolyCop partner manager to receive a partner API key. This key lets you perform partner-level operations, including provisioning users and creating user-level keys on their behalf.
 - **User-level key** — Once a user has been provisioned, use the Partner API endpoint `POST /partner/users/{user_account_id}/api-keys` to create an API key for that user.
 
 Every API key consists of two parts:
@@ -32,7 +32,7 @@ API keys carry **scopes** that control which endpoints they can access (for exam
 
 <Step title="Sign a request with HMAC-SHA256">
 
-Every request to Poly Trader OpenAPI must include four authentication headers. The API verifies the signature server-side before processing the request.
+Every request to PolyCop OpenAPI must include four authentication headers. The API verifies the signature server-side before processing the request.
 
 | Header | Value |
 |---|---|
