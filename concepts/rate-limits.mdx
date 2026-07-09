@@ -1,0 +1,68 @@
+---
+title: "Rate limits"
+sidebarTitle: "Rate Limits"
+description: "Default request limits for PolyCop OpenAPI endpoints."
+---
+
+PolyCop OpenAPI applies several rate-limit buckets to each request. A request must pass every bucket that applies to it.
+
+These are the default production limits. A deployment can override them in configuration.
+
+## Shared limits
+
+Every API Key + HMAC request is checked before and after authentication.
+
+| Bucket | Limit | Applies to |
+|---|---:|---|
+| Global | 6,000 requests / minute | All OpenAPI traffic |
+| Global burst | 1,500 requests / 10 seconds | All OpenAPI traffic |
+| IP | 60 requests / minute | Source IP |
+| IP burst | 20 requests / 10 seconds | Source IP |
+| Public endpoint | 120 requests / minute | HTTP method + endpoint path |
+| Public endpoint burst | 40 requests / 10 seconds | HTTP method + endpoint path |
+| Account | 120 requests / minute | Authenticated account |
+| Account burst | 40 requests / 10 seconds | Authenticated account |
+| API key | 120 requests / minute | API key id |
+| API key burst | 40 requests / 10 seconds | API key id |
+
+## Endpoint limits
+
+The table below shows the per-account endpoint bucket. Shared limits above still apply.
+
+| Method | Endpoint | Per-account endpoint limit |
+|---|---|---|
+| `GET` | `/wallet` | 120 / minute |
+| `POST` | `/wallet/withdraw` | 5 / minute, plus 2 / 10 seconds |
+| `GET` | `/wallet/withdrawals/{withdraw_id}` | 120 / minute |
+| `POST` | `/orders` | 30 / minute, plus 10 / 10 seconds and 300 / 10 minutes |
+| `GET` | `/orders` | 120 / minute |
+| `GET` | `/orders/{order_id}` | 120 / minute |
+| `DELETE` | `/orders/{order_id}` | 30 / minute, plus 10 / 10 seconds and 300 / 10 minutes |
+| `GET` | `/positions` | 120 / minute |
+| `GET` | `/copytrade/configs` | 120 / minute |
+| `POST` | `/copytrade/configs` | 120 / minute |
+| `GET` | `/copytrade/configs/{config_id}` | 120 / minute |
+| `PATCH` | `/copytrade/configs/{config_id}` | 120 / minute |
+| `DELETE` | `/copytrade/configs/{config_id}` | 120 / minute |
+| `POST` | `/copytrade/configs/{config_id}/keywords` | 120 / minute |
+| `DELETE` | `/copytrade/configs/{config_id}/keywords/{key_word_id}` | 120 / minute |
+| `PATCH` | `/copytrade/configs/{config_id}/market-types` | 120 / minute |
+| `GET` | `/copytrade/records` | 120 / minute |
+| `GET` | `/afk/strategies` | 120 / minute |
+| `POST` | `/afk/strategies` | 120 / minute |
+| `GET` | `/afk/strategies/{strategy_id}` | 120 / minute |
+| `PATCH` | `/afk/strategies/{strategy_id}` | 120 / minute |
+| `GET` | `/afk/records` | 120 / minute |
+
+## Rate-limit response
+
+When a request exceeds a limit, the API returns HTTP `429` with `code=RATE_LIMITED`.
+
+| Header | Description |
+|---|---|
+| `Retry-After` | Seconds to wait before retrying |
+| `X-RateLimit-Limit` | The limit for the bucket that rejected the request |
+| `X-RateLimit-Remaining` | Remaining requests in the current window, usually `0` |
+| `X-RateLimit-Reset` | Seconds until the current bucket resets |
+
+Use the `Retry-After` value from the response. Do not retry immediately with a new signature.
