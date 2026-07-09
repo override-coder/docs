@@ -1,10 +1,10 @@
 ---
-title: "PolyCop OpenAPI Error Codes and HTTP Status Guide"
+title: "Error codes"
 sidebarTitle: "Error Codes"
-description: "Complete list of PolyCop OpenAPI error codes, their HTTP status codes, and recommended handling strategies for each error type."
+description: "Error codes returned by the third-party PolyCop OpenAPI."
 ---
 
-Every error response from the PolyCop OpenAPI returns a consistent JSON envelope that always includes a `code` field containing a machine-readable uppercase string. You should branch your error-handling logic on `code` rather than on the HTTP status alone, because multiple distinct error conditions can share the same HTTP status code. The sections below list every possible `code` value, its associated HTTP status, what it means, and the recommended action you should take.
+Every error response includes a machine-readable `code`. Use it with the HTTP status when deciding whether to retry, fix the request, or contact support.
 
 ## General errors
 
@@ -12,7 +12,7 @@ These codes cover request-level problems that can occur on any endpoint.
 
 | Code | HTTP | Meaning | Recommended action |
 |---|---|---|---|
-| `OK` | 200 | Request succeeded | — |
+| `OK` | 200 | Request succeeded | No action |
 | `BAD_REQUEST` | 400 | The request is malformed or missing required fields | Fix the request before retrying |
 | `UNAUTHORIZED` | 401 | Authentication failed | Check your headers and signature |
 | `NOT_FOUND` | 404 | The requested resource does not exist | Verify the resource ID |
@@ -38,9 +38,9 @@ These codes cover problems with your API key credentials or the HMAC signature y
 | Code | HTTP | Meaning | Recommended action |
 |---|---|---|---|
 | `API_KEY_INVALID` | 401 | The `X-API-Key` value was not found | Verify your `X-API-Key` header value |
-| `API_KEY_DISABLED` | 401 | The API key has been disabled or revoked | Generate a new key from your account dashboard |
+| `API_KEY_DISABLED` | 401 | The API key has been disabled or revoked | Create a new key through your partner workflow or contact PolyCop |
 | `API_KEY_LIMIT_EXCEEDED` | 403 | The API key does not have the scope required for this operation | Request a key with the correct permission scopes |
-| `API_KEY_SIGNATURE_INVALID` | 401 | The HMAC-SHA256 signature does not match the server's calculation | Review your canonical string construction — check field order, newline separators, and body hashing |
+| `API_KEY_SIGNATURE_INVALID` | 401 | The HMAC-SHA256 signature does not match the server's calculation | Review your canonical string construction, check field order, newline separators, and body hashing |
 | `API_KEY_TIMESTAMP_EXPIRED` | 401 | The `X-Timestamp` value is outside the allowed ±30 second clock-skew window | Sync your system clock (NTP) and regenerate a fresh timestamp |
 | `API_KEY_NONCE_REPLAYED` | 401 | The nonce value has already been seen within the current time window | Generate a new cryptographically random nonce for every request |
 
@@ -61,7 +61,7 @@ These codes are returned by endpoints that require two-factor authentication (wi
 
 | Code | HTTP | Meaning | Recommended action |
 |---|---|---|---|
-| `TOTP_NOT_ENABLED` | 403 | Your account does not have TOTP configured | Enable TOTP in your account security settings before making withdrawal requests |
+| `TOTP_NOT_ENABLED` | 403 | Your account does not have TOTP configured | Complete TOTP setup outside this API before making withdrawal requests |
 | `TOTP_CODE_INVALID` | 403 | The TOTP code you provided is incorrect | Provide a valid current 6-digit TOTP code |
 | `TOTP_CODE_REPLAYED` | 403 | This TOTP code has already been used | Wait for the next 30-second TOTP window and provide a fresh code |
 | `TOTP_TOO_MANY_FAILURES` | 403 | Too many consecutive TOTP failures | Wait before retrying to avoid a temporary lockout |
@@ -80,13 +80,13 @@ These codes are returned by the `/orders` endpoints.
 
 <Note>
   When you receive `ORDER_RESULT_UNKNOWN`, do **not** immediately retry placing
-  the same order — you may end up with duplicate positions. Always poll
+  the same order, you may create duplicate positions. Always poll
   `GET /orders/{order_id}` first to confirm the outcome.
 </Note>
 
 ## Withdrawal errors
 
-These codes are returned by the `/wallet/withdrawals` endpoints.
+These codes are returned by wallet withdrawal endpoints.
 
 | Code | HTTP | Meaning | Recommended action |
 |---|---|---|---|
@@ -119,7 +119,7 @@ These codes are returned by the `/copytrade` endpoints.
 
 ## Rate limiting
 
-When you exceed a rate limit the server returns HTTP `429` with the code `RATE_LIMITED`. The response includes four headers that tell you exactly when you can retry:
+When you exceed a rate limit the server returns HTTP `429` with the code `RATE_LIMITED`. The response includes headers that tell you when to retry:
 
 | Header | Description |
 |---|---|
@@ -129,15 +129,15 @@ When you exceed a rate limit the server returns HTTP `429` with the code `RATE_L
 | `X-RateLimit-Reset` | Seconds until the current rate-limit bucket resets |
 
 <Note>
-  The withdrawal endpoint (`POST /wallet/withdrawals`) has a dedicated rate
+  The withdrawal creation endpoint (`POST /wallet/withdraw`) has a dedicated rate
   limit of **5 requests per minute per account**, which is stricter than the
   general API rate limit. Build your retry logic to respect the `Retry-After`
   value from the response rather than using a fixed back-off interval.
 </Note>
 
 <Tip>
-  A robust implementation should treat any `429` response as a signal to pause
-  **all** requests to the API (not just the one that was rate-limited), wait
+  A reliable implementation should treat any `429` response as a signal to pause
+  all requests to the API, not just the one that was rate-limited. Wait
   for the number of seconds in `Retry-After`, and then resume with a
   short exponential back-off to avoid immediately re-triggering the limit.
 </Tip>

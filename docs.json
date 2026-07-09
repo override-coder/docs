@@ -52,5 +52,127 @@
         "openapi": "openapi.third-party.yaml"
       }
     ]
-  }
+  },
+  "redirects": [
+    {
+      "source": "/api/afk/create-strategy",
+      "destination": "/api-reference",
+      "permanent": true
+    },
+    {
+      "source": "/api/afk/get-strategy",
+      "destination": "/api-reference",
+      "permanent": true
+    },
+    {
+      "source": "/api/afk/list-records",
+      "destination": "/api-reference",
+      "permanent": true
+    },
+    {
+      "source": "/api/afk/list-strategies",
+      "destination": "/api-reference",
+      "permanent": true
+    },
+    {
+      "source": "/api/afk/update-strategy",
+      "destination": "/api-reference",
+      "permanent": true
+    },
+    {
+      "source": "/api/copytrade/create-config",
+      "destination": "/api-reference",
+      "permanent": true
+    },
+    {
+      "source": "/api/copytrade/delete-config",
+      "destination": "/api-reference",
+      "permanent": true
+    },
+    {
+      "source": "/api/copytrade/get-config",
+      "destination": "/api-reference",
+      "permanent": true
+    },
+    {
+      "source": "/api/copytrade/keywords",
+      "destination": "/api-reference",
+      "permanent": true
+    },
+    {
+      "source": "/api/copytrade/list-configs",
+      "destination": "/api-reference",
+      "permanent": true
+    },
+    {
+      "source": "/api/copytrade/list-records",
+      "destination": "/api-reference",
+      "permanent": true
+    },
+    {
+      "source": "/api/copytrade/market-types",
+      "destination": "/api-reference",
+      "permanent": true
+    },
+    {
+      "source": "/api/copytrade/update-config",
+      "destination": "/api-reference",
+      "permanent": true
+    },
+    {
+      "source": "/api/orders/cancel-order",
+      "destination": "/api-reference",
+      "permanent": true
+    },
+    {
+      "source": "/api/orders/get-order",
+      "destination": "/api-reference",
+      "permanent": true
+    },
+    {
+      "source": "/api/orders/list-orders",
+      "destination": "/api-reference",
+      "permanent": true
+    },
+    {
+      "source": "/api/orders/place-order",
+      "destination": "/api-reference",
+      "permanent": true
+    },
+    {
+      "source": "/api/partner/create-user-api-key",
+      "destination": "/api-reference",
+      "permanent": true
+    },
+    {
+      "source": "/api/partner/create-user",
+      "destination": "/api-reference",
+      "permanent": true
+    },
+    {
+      "source": "/api/partner/list-users",
+      "destination": "/api-reference",
+      "permanent": true
+    },
+    {
+      "source": "/api/positions/list-positions",
+      "destination": "/api-reference",
+      "permanent": true
+    },
+    {
+      "source": "/api/wallet/create-withdrawal",
+      "destination": "/api-reference",
+      "permanent": true
+    },
+    {
+      "source": "/api/wallet/get-wallet",
+      "destination": "/api-reference",
+      "permanent": true
+    },
+    {
+      "source": "/api/wallet/get-withdrawal",
+      "destination": "/api-reference",
+      "permanent": true
+    }
+  ]
 }

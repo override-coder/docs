@@ -1,12 +1,12 @@
 ---
 title: "PolyCop OpenAPI: Introduction"
 sidebarTitle: "Introduction"
-description: "PolyCop OpenAPI is a third-party API for external developers and partners using API Key + HMAC-SHA256 authentication."
+description: "PolyCop OpenAPI is the third-party API for partners using API Key + HMAC-SHA256 authentication."
 ---
 
-PolyCop OpenAPI is a REST API for external developers and partners who need programmatic access to PolyCop workflows. This documentation covers only third-party endpoints authenticated with **API Key + HMAC-SHA256** signatures.
+PolyCop OpenAPI is a REST API for external developers and partners. This documentation covers only endpoints authenticated with API Key + HMAC-SHA256 signatures.
 
-The API exposes partner provisioning, wallet, order, position, copytrade, and AFK strategy endpoints. It does not document first-party Web APIs, Bearer-token login APIs, account management APIs, or security setup APIs.
+The API includes partner provisioning, wallets, orders, positions, copytrade, and AFK strategies. It does not cover first-party Web APIs, Bearer-token login APIs, account management APIs, or security setup APIs.
 
 ## Base URL
 
@@ -20,7 +20,7 @@ Append the endpoint path to this base URL for every request. For example, to cal
 
 ## Response Envelope
 
-Every response from the API — whether a success or an error — is wrapped in the same JSON envelope. This consistent structure makes it straightforward to handle responses uniformly across your integration.
+Every response uses the same JSON envelope, whether the request succeeds or fails. Check `code` first, then read the endpoint-specific `data` field.
 
 ```json
 {
@@ -32,7 +32,7 @@ Every response from the API — whether a success or an error — is wrapped in 
 ```
 
 <ResponseField name="code" type="string" required>
-  A string status code indicating the outcome of the request. `OK` signals success. Any other value indicates an error (e.g., `UNAUTHORIZED`, `NOT_FOUND`).
+  A machine-readable status code. `OK` means the request succeeded. Any other value is an error, such as `UNAUTHORIZED` or `NOT_FOUND`.
 </ResponseField>
 
 <ResponseField name="message" type="string" required>
@@ -40,16 +40,16 @@ Every response from the API — whether a success or an error — is wrapped in 
 </ResponseField>
 
 <ResponseField name="data" type="object | null" required>
-  The response payload for the specific endpoint. On success this contains the requested resource or operation result. On error this field is always `null`.
+  The endpoint-specific payload. On error this field is usually `null`.
 </ResponseField>
 
 <ResponseField name="request_id" type="string" required>
-  A unique identifier for the request, formatted as `req_` followed by a timestamp and sequence number (e.g., `req_202606011200000001`). Include this value when contacting support to help diagnose issues.
+  A unique request identifier. Include it when you contact support.
 </ResponseField>
 
 ## Error Format
 
-When a request fails, the `code` field contains a non-`OK` error code and `data` is set to `null`. The `message` field provides a human-readable description to help you understand what went wrong.
+When a request fails, `code` contains a non-`OK` value and `data` is usually `null`. The `message` field gives a short explanation.
 
 ```json
 {
@@ -60,11 +60,11 @@ When a request fails, the `code` field contains a non-`OK` error code and `data`
 }
 ```
 
-Always check the `code` field — not just the HTTP status code — to determine whether a request succeeded, and surface the `request_id` in any error logs so it can be referenced during support escalations.
+Always check `code`, not only the HTTP status. Log `request_id` with failed requests.
 
 ## Key Constraints
 
-Before building your integration, review the following platform constraints:
+Before you integrate, note these constraints:
 
 <Note>
   **Custodial wallet only.** PolyCop OpenAPI operates exclusively with custodial wallets. You do not manage private keys directly.

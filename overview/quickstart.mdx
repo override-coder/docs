@@ -1,10 +1,10 @@
 ---
 title: "PolyCop OpenAPI Quickstart: Sign and Call the API"
 sidebarTitle: "Quickstart"
-description: "Get an API key, build an HMAC-SHA256 signature, and make your first authenticated GET /wallet request in minutes with this step-by-step guide."
+description: "Create an API key, sign a request, and call GET /wallet."
 ---
 
-This guide walks you through the minimum steps needed to authenticate with PolyCop OpenAPI and make your first successful request. By the end you will have obtained an API key, signed a request using HMAC-SHA256, and retrieved your wallet details from `GET /wallet`.
+This guide shows the shortest path to a signed `GET /wallet` request.
 
 <Steps>
 
@@ -12,8 +12,8 @@ This guide walks you through the minimum steps needed to authenticate with PolyC
 
 API keys come in two levels: partner keys and user-level keys.
 
-- **Partner key** — Contact your PolyCop partner manager to receive a partner API key. This key lets you perform partner-level operations, including provisioning users and creating user-level keys on their behalf.
-- **User-level key** — Once a user has been provisioned, use the Partner API endpoint `POST /partner/users/{user_account_id}/api-keys` to create an API key for that user.
+- Partner key: Contact your PolyCop partner manager. Partner keys can provision users and create user-level keys.
+- User-level key: After a user exists, call `POST /partner/users/{user_account_id}/api-keys` to create a key for that user.
 
 Every API key consists of two parts:
 
@@ -23,27 +23,27 @@ Every API key consists of two parts:
 | `secret` | `sk_` | The private secret used to sign requests |
 
 <Warning>
-  The `secret` is displayed **only once** at creation time. Store it in a secrets manager or secure vault immediately — it cannot be retrieved again.
+  The `secret` is shown only once. Store it in a secrets manager before you close the response.
 </Warning>
 
-API keys carry **scopes** that control which endpoints they can access (for example, `trade:order` or `wallet:read`). Make sure the key you create includes every scope required for your intended use case before you begin integrating.
+API keys have scopes such as `trade:order` and `wallet:read`. Create the key with the scopes your integration needs.
 
 </Step>
 
 <Step title="Sign a request with HMAC-SHA256">
 
-Every request to PolyCop OpenAPI must include four authentication headers. The API verifies the signature server-side before processing the request.
+Every request must include four authentication headers. The API checks the signature before it processes the request.
 
 | Header | Value |
 |---|---|
-| `X-API-Key` | Your `key_id` (e.g., `pk_…`) |
+| `X-API-Key` | Your `key_id` (e.g., `pk_...`) |
 | `X-Timestamp` | Current Unix timestamp in **seconds** (integer) |
 | `X-Nonce` | A random string unique within the timestamp window |
 | `X-Signature` | HMAC-SHA256 hex digest of the canonical string (see below) |
 
 ### Building the canonical string
 
-Concatenate the following fields, each separated by a newline character (`\n`), to produce the string you will sign:
+Join these fields with newline characters (`\n`):
 
 ```
 METHOD + "\n" + PATH + "\n" + QUERY + "\n" + TIMESTAMP + "\n" + NONCE + "\n" + BODY_SHA256
@@ -81,7 +81,7 @@ function sign(method: string, path: string, query: string, body: string, secret:
 
 </CodeGroup>
 
-Pass the returned `timestamp`, `nonce`, and `signature` values directly into the `X-Timestamp`, `X-Nonce`, and `X-Signature` headers of your HTTP request, respectively.
+Put the returned `timestamp`, `nonce`, and `signature` values into the matching headers.
 
 <Note>
   Every retry of a failed request requires a **fresh timestamp, nonce, and signature**. Reusing values from a previous attempt will cause the request to be rejected.
@@ -95,7 +95,7 @@ Pass the returned `timestamp`, `nonce`, and `signature` values directly into the
 
 <Step title="Make your first request: GET /wallet">
 
-With your API key and a freshly generated signature, you are ready to call `GET /wallet`. This endpoint returns the custodial wallet associated with the API key, along with its current balances.
+With an API key and a fresh signature, call `GET /wallet`. It returns the custodial wallet linked to the API key and its balances.
 
 ### Request
 
@@ -129,7 +129,7 @@ A successful call returns an HTTP `200` with the following envelope:
 }
 ```
 
-If you receive a `code` other than `OK`, check that your `X-Signature` was computed from a canonical string that exactly matches your request, and that your `X-Timestamp` reflects the current time.
+If `code` is not `OK`, compare your canonical string with the request you actually sent. Also check that `X-Timestamp` is current.
 
 </Step>
 

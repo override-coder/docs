@@ -1,28 +1,27 @@
 ---
-title: "Idempotency Keys: Safe Retries for PolyCop API"
+title: "Idempotency keys"
 sidebarTitle: "Idempotency"
-description: "Use Idempotency-Key to safely retry failed requests without duplicate side effects. Required for withdrawals, optional for other mutation endpoints."
+description: "Use Idempotency-Key to retry mutation requests without creating duplicate work."
 ---
 
-Network failures, timeouts, and intermittent errors are a fact of distributed systems. The `Idempotency-Key` header lets you retry a failed or timed-out request without risking duplicate side effects — for example, placing the same order twice or sending the same withdrawal twice. The server records the outcome of the first successfully processed request and returns that same cached response to any subsequent request that carries the same key, without re-executing the operation.
+Network failures and timeouts happen. `Idempotency-Key` lets you retry a mutation request without creating the same order, withdrawal, config, or strategy twice. The server binds the key to the first request body it sees and returns the same stored result when you retry with that key.
 
 ## How it works
 
 <Steps>
   <Step title="Generate a unique key">
     Before sending a mutation request, generate a unique `Idempotency-Key`
-    string (max 128 characters) and attach it as a request header. Store this
-    key alongside your operation record so you can use it again on retry.
+    string of up to 128 characters. Store it with your own operation record.
   </Step>
   <Step title="Send the request">
     The server processes the request normally. If the operation succeeds, the
     server stores the response alongside your idempotency key.
   </Step>
   <Step title="On failure or timeout, retry">
-    Resend the request with the **same** `Idempotency-Key`. Generate fresh
-    values for `X-Timestamp`, `X-Nonce`, and `X-Signature` — signature headers
-    are not idempotent and must always be refreshed (see
-    [Authentication](/concepts/authentication)).
+    Resend the request with the same `Idempotency-Key`. Generate fresh
+    values for `X-Timestamp`, `X-Nonce`, and `X-Signature`. Signature headers
+    are not idempotent and must always be refreshed. See
+    [Authentication](/concepts/authentication).
   </Step>
   <Step title="Server returns the cached response">
     If the server already processed a request with that key, it returns the
@@ -31,8 +30,8 @@ Network failures, timeouts, and intermittent errors are a fact of distributed sy
 </Steps>
 
 <Warning>
-  If you retry with the same `Idempotency-Key` but a **different request
-  body**, the server rejects the request with a `CONFLICT` error. An
+  If you retry with the same `Idempotency-Key` but a different request
+  body, the server rejects the request with a `CONFLICT` error. An
   idempotency key is permanently bound to the first request body it was used
   with.
 </Warning>
@@ -41,7 +40,7 @@ Network failures, timeouts, and intermittent errors are a fact of distributed sy
 
 ### Required
 
-The following endpoint **requires** an `Idempotency-Key` header. Omitting it returns an error:
+This endpoint requires an `Idempotency-Key` header. Omitting it returns an error:
 
 | Endpoint | Notes |
 |---|---|
@@ -49,7 +48,7 @@ The following endpoint **requires** an `Idempotency-Key` header. Omitting it ret
 
 ### Optional (strongly recommended)
 
-The following mutation endpoints accept an optional `Idempotency-Key`. Version 1 does not reject requests that omit it, but using it is strongly recommended for all state-changing operations to protect against duplicate execution on retry:
+These mutation endpoints accept an optional `Idempotency-Key`. Version 1 does not reject requests that omit it, but you should use one whenever retrying could duplicate work:
 
 | Endpoint | Description |
 |---|---|
@@ -67,7 +66,7 @@ The following mutation endpoints accept an optional `Idempotency-Key`. Version 1
 ## Key format
 
 <ParamField header="Idempotency-Key" type="string">
-  A unique string of up to **128 characters** that identifies this logical
+  A unique string of up to 128 characters that identifies this logical
   business operation. The recommended format is a UUID v4
   (`550e8400-e29b-41d4-a716-446655440000`) or a stable business identifier such
   as `withdrawal-{your_internal_id}`.
@@ -120,13 +119,12 @@ response = requests.post(
 
 ## Best practices
 
-- **Use UUID v4 or stable business identifiers.** A UUID v4 is cryptographically random and collision-resistant. For withdrawals, a stable business ID (e.g., `withdrawal-{your_internal_id}`) is preferable because you can reconstruct it deterministically even after a process restart.
-- **One key per logical operation.** Never reuse a key for a different operation — the key is permanently bound to the first request body it was submitted with. Reusing it for a different operation will return the old cached response or a `CONFLICT` error.
-- **Store the key with your record.** Persist the idempotency key alongside the operation in your database before you send the request. This ensures you can always retrieve it and retry reliably, even if your process crashes between the write and the network call.
-- **Always refresh signature headers on retry.** The `Idempotency-Key` stays the same across retries, but `X-Timestamp`, `X-Nonce`, and `X-Signature` must be regenerated for each attempt. See [Authentication](/concepts/authentication) for details.
+- Use UUID v4 or a stable business identifier. For withdrawals, a key such as `withdrawal-{your_internal_id}` is easier to reconstruct after a restart.
+- Use one key per logical operation. Reusing a key for a different body returns the old cached response or a `CONFLICT` error.
+- Store the key with your own record before you send the request.
+- Refresh signature headers on every retry. Keep `Idempotency-Key`, but regenerate `X-Timestamp`, `X-Nonce`, and `X-Signature`.
 
 <Tip>
   A common pattern is to derive the idempotency key from your own database
-  primary key: `order-{uuid}`, `withdrawal-{uuid}`. This makes the key
-  deterministic and eliminates any risk of losing it between retries.
+  primary key, such as `order-{uuid}` or `withdrawal-{uuid}`.
 </Tip>

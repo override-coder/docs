@@ -1,14 +1,14 @@
 ---
 title: "Request Signing Examples: TypeScript, Python, cURL"
 sidebarTitle: "Signing Examples"
-description: "Copy-paste HMAC-SHA256 signing implementations for PolyCop OpenAPI in TypeScript, Python, and cURL with a complete working example."
+description: "HMAC-SHA256 signing examples in TypeScript, Python, and Bash."
 ---
 
-Every authenticated request to the PolyCop OpenAPI requires you to build a canonical string from the request's method, path, query, timestamp, nonce, and body hash — then sign it with your secret using HMAC-SHA256 to produce the `X-Signature` header. The examples below show you exactly how to do that in TypeScript/Node.js, Python, and cURL (bash). All three examples target the same `GET /wallet` endpoint so you can compare them side-by-side.
+Every request needs a canonical string and an HMAC-SHA256 signature. These examples sign the same `GET /wallet` request in TypeScript, Python, and Bash.
 
 ## TypeScript / Node.js
 
-The snippet below gives you a standalone `sign()` utility and a thin `apiRequest()` wrapper that attaches all four required headers (`X-API-Key`, `X-Timestamp`, `X-Nonce`, `X-Signature`) before calling the API with the native `fetch`.
+This example uses native `fetch` and attaches the four required headers.
 
 ```typescript
 import crypto from 'crypto';
@@ -80,7 +80,7 @@ async function apiRequest(
   return res.json();
 }
 
-// ── Example: fetch your wallet ──────────────────────────────────────────────
+// Example: fetch your wallet
 const KEY_ID = 'pk_your_key_id';
 const SECRET = 'sk_your_secret';
 
@@ -89,14 +89,14 @@ apiRequest(KEY_ID, SECRET, 'GET', '/wallet').then(console.log);
 
 <Note>
   The `path` argument passed to `sign()` must be the **full path** including the
-  `/openapi/v1` prefix — for example `/openapi/v1/wallet` — even though
+  `/openapi/v1` prefix, for example `/openapi/v1/wallet`, even though
   `endpoint` is the short form `/wallet`. The server uses the full path when
   it verifies your signature.
 </Note>
 
 ## Python
 
-The Python version uses only standard-library modules (`hashlib`, `hmac`, `secrets`, `json`, `urllib.parse`) plus the popular `requests` package for the HTTP call. The signing logic is identical to the TypeScript version above.
+The Python version uses standard library modules for signing and `requests` for the HTTP call.
 
 ```python
 import hashlib
@@ -165,7 +165,7 @@ def api_request(
     return response.json()
 
 
-# ── Example: fetch your wallet ──────────────────────────────────────────────
+# Example: fetch your wallet
 KEY_ID = 'pk_your_key_id'
 SECRET = 'sk_your_secret'
 
@@ -174,7 +174,7 @@ print(result)
 ```
 
 <Note>
-  Python's `hmac` module is called as `hmac.new(key, msg, digestmod)` — not
+  Python's `hmac` module is called as `hmac.new(key, msg, digestmod)`, not
   `hmac.HMAC(...)` directly. Pass `hashlib.sha256` as the `digestmod` argument
   and call `.hexdigest()` on the result to get the lowercase hex signature
   string the server expects.
@@ -182,7 +182,7 @@ print(result)
 
 ## cURL (Bash)
 
-Because cURL itself has no built-in HMAC support, you need a small shell script to pre-compute the signature with `openssl` before passing the headers to `curl`. The script below is self-contained — the only dependencies are `openssl` and `curl`, which ship with every major Linux distribution and macOS.
+cURL cannot compute the HMAC signature by itself. This script uses `openssl` to build the signature, then sends the request with `curl`.
 
 ```bash
 #!/usr/bin/env bash
@@ -236,7 +236,7 @@ curl -s -X GET "https://test-eu.polycopy.fun/openapi/v1/wallet" \
 
 ## POST example with body
 
-The same `apiRequest()` helper handles `POST` requests. Pass your JSON body as the last argument and it will be serialised, hashed, and signed automatically. Here is an example that places a buy order:
+The same `apiRequest()` helper handles `POST` requests. Pass the JSON body as the last argument so the helper can serialize, hash, and sign the same bytes it sends.
 
 ```typescript
 // Place a buy order for $10 of a prediction-market asset
@@ -251,7 +251,7 @@ console.log(order);
 <Tip>
   For `POST` requests make sure you serialise the body with
   `JSON.stringify(body)` (TypeScript) or
-  `json.dumps(body, separators=(',', ':'))` (Python) **before** hashing it, and
-  that you send the **exact same bytes** in the HTTP body. Any difference —
-  extra whitespace, key ordering, encoding — will invalidate the signature.
+  `json.dumps(body, separators=(',', ':'))` (Python) before hashing it. Send
+  those exact bytes in the HTTP body. Extra whitespace, different key ordering,
+  or a different encoding will invalidate the signature.
 </Tip>
