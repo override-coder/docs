@@ -648,6 +648,7 @@ paths:
       - AFK
       summary: Create an AFK strategy
       description: Creates an AFK automatic trading strategy. Maps to master `CreateAFKStrategy`.
+        The master create RPC returns only a success acknowledgement; call `GET /afk/strategies` after creation to read the created strategy id and current status.
       operationId: createAFKStrategy
       parameters:
       - "$ref": "#/components/parameters/IdempotencyKey"
@@ -673,7 +674,7 @@ paths:
                 - type: object
                   properties:
                     data:
-                      "$ref": "#/components/schemas/AFKStrategy"
+                      "$ref": "#/components/schemas/AFKStrategyCreateResult"
         '422':
           "$ref": "#/components/responses/ValidationFailed"
   "/afk/strategies/{strategy_id}":
@@ -1953,6 +1954,17 @@ components:
             format: date-time
             nullable: true
             description: Strategy create time derived from master `create_dt`.
+    AFKStrategyCreateResult:
+      type: object
+      required:
+      - status
+      description: Creation acknowledgement. The master create RPC returns no strategy id;
+        call `GET /afk/strategies` to read the created strategy.
+      properties:
+        status:
+          type: string
+          enum:
+          - created
     AFKStrategyList:
       type: object
       required:
