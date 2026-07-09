@@ -1,12 +1,12 @@
 ---
 title: "PolyCop OpenAPI: Introduction"
 sidebarTitle: "Introduction"
-description: "PolyCop OpenAPI is the third-party API using API Key + HMAC-SHA256 authentication."
+description: "PolyCop OpenAPI is the third-party API using API key + HMAC-SHA256 authentication."
 ---
 
-PolyCop OpenAPI is a REST API for external developers. This documentation covers only endpoints authenticated with API Key + HMAC-SHA256 signatures.
+PolyCop OpenAPI is a REST API for external developers. This documentation covers only endpoints authenticated with API key + HMAC-SHA256 signatures.
 
-The API includes wallets, orders, positions, copytrade, AFK strategies, and partner-only user provisioning/API key creation. It does not cover first-party Web APIs, Bearer-token login APIs, account management APIs, or security setup APIs.
+The API includes wallets, orders, positions, copytrade, AFK strategies, and partner-only user provisioning and API key creation. It does not cover first-party web APIs, bearer-token login APIs, account management APIs, or security setup APIs.
 
 ## Base URL
 
@@ -18,7 +18,7 @@ https://test-eu.polycopy.fun/openapi/v1
 
 Append the endpoint path to this base URL for every request. For example, to call the wallet endpoint, use `https://test-eu.polycopy.fun/openapi/v1/wallet`.
 
-## Response Envelope
+## Response envelope
 
 Every response uses the same JSON envelope, whether the request succeeds or fails. Check `code` first, then read the endpoint-specific `data` field.
 
@@ -47,7 +47,7 @@ Every response uses the same JSON envelope, whether the request succeeds or fail
   A unique request identifier. Include it when you contact support.
 </ResponseField>
 
-## Error Format
+## Error format
 
 When a request fails, `code` contains a non-`OK` value and `data` is usually `null`. The `message` field gives a short explanation.
 
@@ -60,9 +60,9 @@ When a request fails, `code` contains a non-`OK` value and `data` is usually `nu
 }
 ```
 
-Always check `code`, not only the HTTP status. Log `request_id` with failed requests.
+Use `code` together with the HTTP status. Log `request_id` with failed requests.
 
-## Key Constraints
+## Key constraints
 
 Before you integrate, note these constraints:
 

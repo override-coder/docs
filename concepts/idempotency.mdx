@@ -1,10 +1,10 @@
 ---
 title: "Idempotency keys"
 sidebarTitle: "Idempotency"
-description: "Use Idempotency-Key to retry mutation requests without creating duplicate work."
+description: "Use Idempotency-Key to retry mutation requests without creating duplicate operations."
 ---
 
-Network failures and timeouts happen. `Idempotency-Key` lets you retry a mutation request without creating the same order, withdrawal, config, or strategy twice. The server binds the key to the first request body it sees and returns the same stored result when you retry with that key.
+Network failures and timeouts happen. `Idempotency-Key` lets you retry a mutation request without creating the same order, withdrawal, config, or strategy twice. The server binds the key to the first request body it receives and returns the same stored result when you retry with that key.
 
 ## How it works
 
@@ -48,7 +48,7 @@ This endpoint requires an `Idempotency-Key` header. Omitting it returns an error
 
 ### Optional (strongly recommended)
 
-These mutation endpoints accept an optional `Idempotency-Key`. Version 1 does not reject requests that omit it, but you should use one whenever retrying could duplicate work:
+These mutation endpoints accept an optional `Idempotency-Key`. Version 1 does not reject requests that omit it, but you should use one whenever a retry could duplicate an operation:
 
 | Endpoint | Description |
 |---|---|

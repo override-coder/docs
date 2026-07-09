@@ -5,9 +5,9 @@ info:
   license:
     name: Proprietary
   description: |
-    Public third-party API for the openapi gateway service.
+    Public third-party API for the PolyCop OpenAPI gateway.
 
-    This document only exposes API Key authenticated endpoints. All requests use HMAC-SHA256 signatures with `X-API-Key`, `X-Timestamp`, `X-Nonce`, and `X-Signature`.
+    This document only exposes API key authenticated endpoints. All requests use HMAC-SHA256 signatures with `X-API-Key`, `X-Timestamp`, `X-Nonce`, and `X-Signature`.
 
     Core constraints:
     - Custodial wallet only.
@@ -84,7 +84,7 @@ paths:
       parameters:
       - "$ref": "#/components/parameters/RequiredIdempotencyKey"
       description: |
-        API key signed request. Withdraw requires 2FA, Idempotency-Key, and only supports Polygon in v1.
+        API key signed request. Withdrawals require 2FA and `Idempotency-Key`, and only Polygon is supported in v1.
         `Idempotency-Key` is mandatory for this endpoint. It identifies one business withdrawal request.
         Client retries after timeout or network failure must reuse the same `Idempotency-Key` and
         exactly the same JSON body; each retry still needs a fresh `X-Timestamp`, `X-Nonce`, and
@@ -338,8 +338,8 @@ paths:
       description: |
         Create a copytrade configuration for the account represented by the API key.
 
-        This endpoint is included in v1. It requires API key HMAC signature and
-        does not require 2FA. The openapi service creates the config for the
+        This endpoint is included in v1. It requires an API key HMAC signature and
+        does not require 2FA. The OpenAPI gateway creates the config for the
         trading account represented by the API key.
       operationId: createCopytradeConfig
       parameters:
@@ -846,7 +846,7 @@ paths:
       - Partner
       summary: List partner users
       operationId: listPartnerUsers
-      description: Requires a partner API key with `partner:users:manage` or `*` scope. Returns paginated non-sensitive partner user information, including public wallet addresses and recent activity time.
+      description: Requires a partner API key with `partner:users:manage` or `*` scope. Returns paginated non-sensitive partner user information, including public wallet addresses and recent activity times.
       security:
       - ApiKeyAuth: []
         ApiTimestamp: []
@@ -878,7 +878,7 @@ paths:
       - Partner
       summary: Create or get a partner user
       operationId: createPartnerUser
-      description: Requires a partner API key with `partner:users:manage` or `*` scope. If the user already exists for the same `external_user_id`, this endpoint returns that user and may retry wallet initialization when needed.
+      description: Requires a partner API key with `partner:users:manage` or `*` scope. If a user already exists for the same `external_user_id`, this endpoint returns that user and may retry wallet initialization when needed.
       security:
       - ApiKeyAuth: []
         ApiTimestamp: []
@@ -916,7 +916,7 @@ paths:
       - Partner
       summary: Create a user API key for a partner user
       operationId: createPartnerUserApiKey
-      description: Requires a partner API key with `partner:api_keys:manage` or `*` scope. The partner user must have `wallet_status=ready`; if it is `pending` or `failed`, retry create-or-get for the same `external_user_id` before creating the user API key. The returned secret is shown only once.
+      description: Requires a partner API key with `partner:api_keys:manage` or `*` scope. The partner user must have `wallet_status=ready`. If it is `pending` or `failed`, retry create-or-get for the same `external_user_id` before creating the user API key. The returned secret is shown only once.
       parameters:
       - "$ref": "#/components/parameters/IdempotencyKey"
       - name: user_account_id
@@ -963,7 +963,7 @@ paths:
       - Partner
       summary: Revoke a user API key for a partner user
       operationId: revokePartnerUserApiKey
-      description: Requires a partner API key with `partner:api_keys:manage` or `*` scope. Only revokes user API keys created by the authenticated partner for the specified `user_account_id`; it cannot revoke another partner's keys or direct user keys.
+      description: Requires a partner API key with `partner:api_keys:manage` or `*` scope. Revokes only user API keys created by the authenticated partner for the specified `user_account_id`. It cannot revoke another partner's keys or direct user keys.
       parameters:
       - name: user_account_id
         in: path
@@ -1034,7 +1034,7 @@ components:
       name: Idempotency-Key
       in: header
       required: false
-      description: Optional idempotency key. V1 does not reject requests that omit
+      description: Optional idempotency key. v1 does not reject requests that omit
         it.
       schema:
         type: string
@@ -1522,7 +1522,7 @@ components:
             `trade:read`, `trade:order`, `trade:cancel`, `wallet:read`, `positions:read`,
             `copytrade:read`, `copytrade:manage`, `afk:read`, or `afk:manage`.
 
-            `withdraw:create` is not supported for partner user API keys in V1 because withdrawals
+            `withdraw:create` is not supported for partner user API keys in v1 because withdrawals
             require account-level 2FA. To enable this permission later, first add a partner-user 2FA binding flow,
             then add `withdraw:create` to the allowed partner user key scopes.
           items:

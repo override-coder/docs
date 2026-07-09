@@ -1,10 +1,10 @@
 ---
 title: "Partner API"
 sidebarTitle: "Partner API"
-description: "List partner users and create user API keys with a partner API key."
+description: "List partner users and manage user API keys with a partner API key."
 ---
 
-Partner APIs are available only to approved partners. They use the same API Key + HMAC-SHA256 signing flow as the trading APIs, but the key must be a partner API key.
+Partner APIs are available only to approved partners. They use the same API key + HMAC-SHA256 signing flow as the trading APIs, but the key must be a partner API key.
 
 ## Partner key requirements
 
@@ -17,7 +17,7 @@ Use a partner API key with the required scope:
 | `POST /partner/users/{user_account_id}/api-keys` | `partner:api_keys:manage` or `*` |
 | `DELETE /partner/users/{user_account_id}/api-keys/{key_id}` | `partner:api_keys:manage` or `*` |
 
-Partner API keys are issued by PolyCop. Use them to create or get partner users, list those users, and create user API keys for a selected `user_account_id`.
+PolyCop issues partner API keys. Use them to create or get partner users, list those users, create user API keys for a selected `user_account_id`, and revoke user API keys created by your partner account.
 
 ## List partner users
 
@@ -78,7 +78,7 @@ The response includes the user API key. The `secret` is shown only once.
   Store the returned `secret` immediately. PolyCop cannot show it again.
 </Warning>
 
-If `scopes` is omitted, PolyCop grants the default user scopes: `trade:read`, `trade:order`, `trade:cancel`, `wallet:read`, `positions:read`, `copytrade:read`, `copytrade:manage`, `afk:read`, and `afk:manage`.
+If `scopes` is omitted, PolyCop grants these default user scopes: `trade:read`, `trade:order`, `trade:cancel`, `wallet:read`, `positions:read`, `copytrade:read`, `copytrade:manage`, `afk:read`, and `afk:manage`.
 
 User API keys cannot use the wildcard `*` scope. `withdraw:create` is not supported for partner user API keys in v1 because withdrawals require account-level 2FA.
 

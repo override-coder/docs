@@ -1,6 +1,6 @@
 ---
 title: "Error codes"
-sidebarTitle: "Error Codes"
+sidebarTitle: "Error codes"
 description: "Error codes returned by the third-party PolyCop OpenAPI."
 ---
 
@@ -18,7 +18,7 @@ These codes cover request-level problems that can occur on any endpoint.
 | `FORBIDDEN` | 403 | The API key is authenticated but not allowed to perform this operation | Check the API key type and scopes |
 | `NOT_FOUND` | 404 | The requested resource does not exist | Verify the resource ID |
 | `VALIDATION_FAILED` | 422 | The request body failed schema validation | Correct the invalid body fields and retry |
-| `CONFLICT` | 409 | Conflict, e.g. a duplicate idempotency key submitted with a different body | Check your request for duplicate keys |
+| `CONFLICT` | 409 | Conflict, such as an idempotency key reused with a different body | Check your request for duplicate keys |
 | `RATE_LIMITED` | 429 | Too many requests | Wait for the `Retry-After` header value and then retry |
 | `INTERNAL_ERROR` | 500 | Unexpected server-side error | Retry with exponential backoff |
 | `MASTER_UNAVAILABLE` | 502 | An upstream service is unavailable | Retry with exponential backoff |
@@ -42,17 +42,15 @@ These codes cover problems with your API key credentials or the HMAC signature y
 | `API_KEY_DISABLED` | 401 | The API key has been disabled or revoked | Contact PolyCop to rotate or replace the key |
 | `API_KEY_LIMIT_EXCEEDED` | 403 | The API key does not have the scope required for this operation | Request a key with the correct permission scopes |
 | `API_KEY_SIGNATURE_INVALID` | 401 | The HMAC-SHA256 signature does not match the server's calculation | Review your canonical string construction, check field order, newline separators, and body hashing |
-| `API_KEY_TIMESTAMP_EXPIRED` | 401 | The `X-Timestamp` value is outside the allowed ±30 second clock-skew window | Sync your system clock (NTP) and regenerate a fresh timestamp |
+| `API_KEY_TIMESTAMP_EXPIRED` | 401 | The `X-Timestamp` value is more than 30 seconds before or after server time | Sync your system clock with NTP and regenerate a fresh timestamp |
 | `API_KEY_NONCE_REPLAYED` | 401 | The nonce value has already been seen within the current time window | Generate a new cryptographically random nonce for every request |
 
 <Warning>
-  `API_KEY_SIGNATURE_INVALID` is the most common integration error. The three
-  most frequent root causes are: (1) using the **short path** (e.g. `/wallet`)
-  instead of the **full path** (e.g. `/openapi/v1/wallet`) in the canonical
-  string, (2) hashing the body **after** sending it instead of hashing the
-  exact bytes you will send, and (3) using escaped `\n` characters in the
-  canonical string instead of real newline bytes. See the
-  [Signing Examples](/examples/signing) page for copy-paste reference
+  `API_KEY_SIGNATURE_INVALID` is the most common integration error. The usual
+  causes are using the short path, such as `/wallet`, instead of the full path,
+  such as `/openapi/v1/wallet`; hashing a body that differs from the exact bytes
+  sent over HTTP; or using escaped `\n` characters instead of real newline
+  bytes. See [Signing examples](/examples/signing) for reference
   implementations.
 </Warning>
 
@@ -81,7 +79,7 @@ These codes are returned by the `/orders` endpoints.
 
 <Note>
   When you receive `ORDER_RESULT_UNKNOWN`, do **not** immediately retry placing
-  the same order, you may create duplicate positions. Always poll
+  the same order. You may create duplicate positions. Always poll
   `GET /orders/{order_id}` first to confirm the outcome.
 </Note>
 
@@ -128,7 +126,7 @@ These codes are returned by partner-only user provisioning and user API key endp
 
 ## Rate limiting
 
-When you exceed a rate limit the server returns HTTP `429` with the code `RATE_LIMITED`. The response includes headers that tell you when to retry. See [Rate Limits](/concepts/rate-limits) for the per-endpoint limits.
+When you exceed a rate limit, the server returns HTTP `429` with the code `RATE_LIMITED`. The response includes headers that tell you when to retry. See [Rate limits](/concepts/rate-limits) for the per-endpoint limits.
 
 | Header | Description |
 |---|---|
@@ -141,12 +139,12 @@ When you exceed a rate limit the server returns HTTP `429` with the code `RATE_L
   The withdrawal creation endpoint (`POST /wallet/withdraw`) has a dedicated rate
   limit of **5 requests per minute per account**, which is stricter than the
   general API rate limit. Build your retry logic to respect the `Retry-After`
-  value from the response rather than using a fixed back-off interval.
+  value from the response rather than using a fixed backoff interval.
 </Note>
 
 <Tip>
   A reliable implementation should treat any `429` response as a signal to pause
-  all requests to the API, not just the one that was rate-limited. Wait
-  for the number of seconds in `Retry-After`, and then resume with a
-  short exponential back-off to avoid immediately re-triggering the limit.
+  all requests to the API. Wait for the number of seconds in `Retry-After`, then
+  resume with a short exponential backoff to avoid immediately triggering the
+  same limit again.
 </Tip>

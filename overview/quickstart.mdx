@@ -1,5 +1,5 @@
 ---
-title: "PolyCop OpenAPI Quickstart: Sign and Call the API"
+title: "PolyCop OpenAPI quickstart: Sign and call the API"
 sidebarTitle: "Quickstart"
 description: "Receive an API key, sign a request, and call GET /wallet."
 ---
@@ -27,7 +27,7 @@ API keys have scopes such as `trade:order` and `wallet:read`. Request a key with
 
 </Step>
 
-<Step title="Sign a request with HMAC-SHA256">
+<Step title="Sign the request with HMAC-SHA256">
 
 Every request must include four authentication headers. The API checks the signature before it processes the request.
 
@@ -78,7 +78,7 @@ function sign(method: string, path: string, query: string, body: string, secret:
 
 </CodeGroup>
 
-Put the returned `timestamp`, `nonce`, and `signature` values into the matching headers.
+Put the returned `timestamp`, `nonce`, and `signature` values into the matching request headers.
 
 <Note>
   Every retry of a failed request requires a **fresh timestamp, nonce, and signature**. Reusing values from a previous attempt will cause the request to be rejected.
@@ -126,7 +126,7 @@ A successful call returns an HTTP `200` with the following envelope:
 }
 ```
 
-If `code` is not `OK`, compare your canonical string with the request you actually sent. Also check that `X-Timestamp` is current.
+If `code` is not `OK`, compare your canonical string with the request you sent. Also check that `X-Timestamp` is current.
 
 </Step>
 

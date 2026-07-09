@@ -15,7 +15,7 @@ Send these four headers on every request:
 </ParamField>
 
 <ParamField header="X-Timestamp" type="integer" required>
-  Unix timestamp in seconds. It must be within +/-30 seconds of the server time.
+  Unix timestamp in seconds. It must be no more than 30 seconds before or after the server time.
 </ParamField>
 
 <ParamField header="X-Nonce" type="string" required>
@@ -108,9 +108,9 @@ e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
 
 The server enforces a strict clock-skew window to prevent replay attacks:
 
-- Your `X-Timestamp` must be within +/-30 seconds of the server's current Unix time.
+- Your `X-Timestamp` must be no more than 30 seconds before or after the server's current Unix time.
 - If the timestamp falls outside this window, the server rejects the request with `API_KEY_TIMESTAMP_EXPIRED`.
-- Use a time-synchronised clock source (e.g., NTP) on your signing host to avoid drift. Cloud environments typically synchronise automatically; embedded or local systems may require explicit NTP configuration.
+- Use a time-synchronized clock source, such as NTP, on your signing host to avoid drift. Cloud environments usually synchronize automatically; embedded or local systems may require explicit NTP configuration.
 
 ## Nonce rules
 
@@ -118,7 +118,7 @@ A nonce ("number used once") prevents an attacker who intercepts a valid request
 
 - Your nonce must be **unique within the same timestamp window**. Two requests with the same `X-Timestamp` value and the same `X-Nonce` value will conflict.
 - Replaying a nonce within the timestamp window is rejected with `API_KEY_NONCE_REPLAYED`.
-- Generate nonces using a **cryptographically secure random source**, for example, 16 or more random bytes encoded as a lowercase hex string (resulting in a 32+ character string).
+- Generate nonces using a **cryptographically secure random source**. For example, use 16 or more random bytes encoded as a lowercase hex string. This produces a string of at least 32 characters.
 
 <Tip>
   A UUID v4 works well as a nonce. It is random enough for this use and easy to
@@ -136,7 +136,7 @@ A nonce ("number used once") prevents an attacker who intercepts a valid request
   signature headers.
 </Warning>
 
-See [Idempotency](/concepts/idempotency) for guidance on safely retrying state-changing requests.
+See [Idempotency](/concepts/idempotency) for guidance on retrying state-changing requests.
 
 ## API key scopes
 

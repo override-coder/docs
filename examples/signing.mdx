@@ -1,6 +1,6 @@
 ---
-title: "Request Signing Examples: TypeScript, Python, cURL"
-sidebarTitle: "Signing Examples"
+title: "Request signing examples: TypeScript, Python, cURL"
+sidebarTitle: "Signing examples"
 description: "HMAC-SHA256 signing examples in TypeScript, Python, and Bash."
 ---
 
@@ -16,7 +16,7 @@ import crypto from 'crypto';
 const BASE_URL = 'https://test-eu.polycopy.fun/openapi/v1';
 
 /**
- * Build the canonical string and return the three signing artefacts.
+ * Build the canonical string and return the three signing artifacts.
  * The canonical string is:
  *   METHOD\nPATH\nQUERY\nTIMESTAMP\nNONCE\nBODY_HASH
  */
@@ -249,7 +249,7 @@ console.log(order);
 ```
 
 <Tip>
-  For `POST` requests make sure you serialise the body with
+  For `POST` requests, serialize the body with
   `JSON.stringify(body)` (TypeScript) or
   `json.dumps(body, separators=(',', ':'))` (Python) before hashing it. Send
   those exact bytes in the HTTP body. Extra whitespace, different key ordering,

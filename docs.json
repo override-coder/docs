@@ -27,7 +27,7 @@
             ]
           },
           {
-            "group": "Core Concepts",
+            "group": "Core concepts",
             "pages": [
               "concepts/authentication",
               "concepts/partner-api",
@@ -36,7 +36,7 @@
             ]
           },
           {
-            "group": "Code Examples",
+            "group": "Code examples",
             "pages": [
               "examples/signing"
             ]
