@@ -1,10 +1,10 @@
 ---
-title: "PolyCop OpenAPI: Programmatic Trading for Partners"
+title: "PolyCop OpenAPI: Programmatic Trading API"
 sidebarTitle: "Home"
-description: "PolyCop OpenAPI gives partners API access to wallets, orders, positions, copytrade, and AFK strategies through API Key + HMAC-SHA256 authentication."
+description: "PolyCop OpenAPI gives third-party integrations access to wallets, orders, positions, copytrade, and AFK strategies through API Key + HMAC-SHA256 authentication."
 ---
 
-PolyCop OpenAPI is the third-party API for partner provisioning, wallets, orders, positions, copytrade, and AFK strategies. Every documented endpoint uses API Key + HMAC-SHA256 authentication.
+PolyCop OpenAPI is the third-party API for wallets, orders, positions, copytrade, and AFK strategies. Every documented endpoint uses API Key + HMAC-SHA256 authentication.
 
 <CardGroup cols={2}>
   <Card title="Introduction" icon="book-open" href="/overview/introduction">
@@ -25,7 +25,7 @@ PolyCop OpenAPI is the third-party API for partner provisioning, wallets, orders
 
 <Steps>
   <Step title="Obtain an API key">
-    Contact your PolyCop partner manager for a partner key, or create a user key through the Partner API. Store the secret immediately. It is shown only once.
+    Contact PolyCop to receive an API key for your account. Store the secret immediately. It is shown only once.
   </Step>
   <Step title="Build your HMAC-SHA256 signature">
     Construct the canonical string from method, path, query, timestamp, nonce, and body hash, then sign it with your secret key using HMAC-SHA256.
@@ -41,9 +41,6 @@ PolyCop OpenAPI is the third-party API for partner provisioning, wallets, orders
 ## What you can do
 
 <CardGroup cols={3}>
-  <Card title="Partner provisioning" icon="users" href="/api-reference">
-    Create and manage sub-accounts and delegated API keys for your users.
-  </Card>
   <Card title="Wallet and withdrawals" icon="wallet" href="/api-reference">
     Query custodial wallet balances and initiate Polygon withdrawals.
   </Card>

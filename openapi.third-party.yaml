@@ -27,7 +27,6 @@ x-doc-classification:
       programmatic_trading: API key plus HMAC
   level_3:
     Third-party API:
-    - partner
     - wallet
     - orders
     - positions
@@ -35,8 +34,6 @@ x-doc-classification:
     - afk
     - withdraw
 tags:
-- name: Partner
-  description: Partner account user provisioning and delegated user API key creation.
 - name: Wallet
   description: Custodial wallet balance and Polygon withdrawal APIs.
 - name: Orders
@@ -48,127 +45,6 @@ tags:
 - name: AFK
   description: AFK strategy configuration and execution records.
 paths:
-  "/partner/users":
-    get:
-      tags:
-      - Partner
-      summary: List partner users
-      operationId: listPartnerUsers
-      description: Requires a partner API key with `partner:users:manage` or `*` scope.
-        Results are ordered by newest partner user first. Use the returned `next_cursor`
-        as the next request's `cursor`.
-      security:
-      - ApiKeyAuth: []
-        ApiTimestamp: []
-        ApiNonce: []
-        ApiSignature: []
-      parameters:
-      - "$ref": "#/components/parameters/Limit"
-      - "$ref": "#/components/parameters/Cursor"
-      responses:
-        '200':
-          description: Partner user list
-          content:
-            application/json:
-              schema:
-                allOf:
-                - "$ref": "#/components/schemas/ApiResponse"
-                - type: object
-                  properties:
-                    data:
-                      "$ref": "#/components/schemas/PartnerUserListData"
-        '400':
-          "$ref": "#/components/responses/BadRequest"
-        '401':
-          "$ref": "#/components/responses/Unauthorized"
-        '403':
-          "$ref": "#/components/responses/Forbidden"
-    post:
-      tags:
-      - Partner
-      summary: Create or get a partner user
-      operationId: createPartnerUser
-      description: Requires a partner API key with `partner:users:manage` or `*` scope.
-      security:
-      - ApiKeyAuth: []
-        ApiTimestamp: []
-        ApiNonce: []
-        ApiSignature: []
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              "$ref": "#/components/schemas/PartnerUserCreateRequest"
-      responses:
-        '200':
-          description: Partner user created or returned
-          content:
-            application/json:
-              schema:
-                allOf:
-                - "$ref": "#/components/schemas/ApiResponse"
-                - type: object
-                  properties:
-                    data:
-                      "$ref": "#/components/schemas/PartnerUserData"
-        '400':
-          "$ref": "#/components/responses/BadRequest"
-        '401':
-          "$ref": "#/components/responses/Unauthorized"
-        '403':
-          "$ref": "#/components/responses/Forbidden"
-        '404':
-          "$ref": "#/components/responses/NotFound"
-  "/partner/users/{user_account_id}/api-keys":
-    post:
-      tags:
-      - Partner
-      summary: Create a user API key for a partner user
-      operationId: createPartnerUserApiKey
-      description: Requires a partner API key with `partner:api_keys:manage` or `*`
-        scope. The partner user must have `wallet_status=ready`; if it is `pending`
-        or `failed`, retry create-or-get for the same `external_user_id` before creating
-        the user API key. The returned secret is shown only once.
-      security:
-      - ApiKeyAuth: []
-        ApiTimestamp: []
-        ApiNonce: []
-        ApiSignature: []
-      parameters:
-      - name: user_account_id
-        in: path
-        required: true
-        schema:
-          "$ref": "#/components/schemas/AccountId"
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              "$ref": "#/components/schemas/PartnerUserApiKeyCreateRequest"
-      responses:
-        '200':
-          description: User API key created
-          content:
-            application/json:
-              schema:
-                allOf:
-                - "$ref": "#/components/schemas/ApiResponse"
-                - type: object
-                  properties:
-                    data:
-                      "$ref": "#/components/schemas/CreateApiKeyData"
-        '400':
-          "$ref": "#/components/responses/BadRequest"
-        '401':
-          "$ref": "#/components/responses/Unauthorized"
-        '403':
-          "$ref": "#/components/responses/Forbidden"
-        '404':
-          "$ref": "#/components/responses/NotFound"
-        '409':
-          "$ref": "#/components/responses/Conflict"
   "/wallet":
     get:
       tags:
@@ -460,8 +336,8 @@ paths:
         Create a copytrade configuration for the account represented by the API key.
 
         This endpoint is included in v1. It requires API key HMAC signature and
-        does not require TOTP. The openapi service maps the API key to
-        `master_telegram_id` and calls master `CreateCopyTradeConfig`.
+        does not require TOTP. The openapi service creates the config for the
+        trading account represented by the API key.
       operationId: createCopytradeConfig
       parameters:
       - "$ref": "#/components/parameters/IdempotencyKey"
@@ -1255,162 +1131,6 @@ components:
       type: string
       pattern: "^99[0-9]{20}$"
       example: '9912345678901234564821'
-    ApiKey:
-      type: object
-      required:
-      - key_id
-      - name
-      - status
-      - scopes
-      - ip_whitelist
-      - created_at
-      properties:
-        key_id:
-          type: string
-          example: pk_abc
-        name:
-          type: string
-        status:
-          type: string
-          enum:
-          - active
-          - revoked
-          - disabled
-        scopes:
-          type: array
-          items:
-            type: string
-          example:
-          - "*"
-        ip_whitelist:
-          type: array
-          items:
-            type: string
-        last_used_at:
-          type: string
-          format: date-time
-          nullable: true
-        created_at:
-          type: string
-          format: date-time
-    CreateApiKeyData:
-      allOf:
-      - "$ref": "#/components/schemas/ApiKey"
-      - type: object
-        required:
-        - secret
-        properties:
-          secret:
-            type: string
-            description: API key secret. Shown only once.
-            example: sk_xxx
-    PartnerUserCreateRequest:
-      type: object
-      required:
-      - external_user_id
-      properties:
-        external_user_id:
-          type: string
-          description: Partner-side stable user id.
-          example: user_123
-        display_name:
-          type: string
-          example: Alice
-        email:
-          type: string
-          format: email
-          example: alice@example.com
-    PartnerUserData:
-      type: object
-      required:
-      - partner_account_id
-      - user_account_id
-      - external_user_id
-      - status
-      - wallet_status
-      - created_at
-      - updated_at
-      properties:
-        partner_account_id:
-          "$ref": "#/components/schemas/AccountId"
-        user_account_id:
-          "$ref": "#/components/schemas/AccountId"
-        external_user_id:
-          type: string
-          example: user_123
-        display_name:
-          type: string
-        email:
-          type: string
-        status:
-          type: string
-          enum:
-          - active
-          - disabled
-        wallet_status:
-          type: string
-          description: Wallet initialization status for this partner user. `ready`
-            means the user's custodial trading wallet has been initialized; `pending`
-            or `failed` means the partner may retry create-or-get for the same external_user_id
-            to initialize the wallet.
-          enum:
-          - pending
-          - ready
-          - failed
-        wallet_created:
-          type: boolean
-          nullable: true
-        wallet_initialized_at:
-          type: string
-          format: date-time
-          nullable: true
-        created_at:
-          type: string
-          format: date-time
-        updated_at:
-          type: string
-          format: date-time
-    PartnerUserListData:
-      type: object
-      required:
-      - items
-      properties:
-        items:
-          type: array
-          items:
-            "$ref": "#/components/schemas/PartnerUserData"
-        next_cursor:
-          type: string
-          nullable: true
-          description: Cursor for the next page. It is the last `user_account_id`
-            from the current page; omit it when this field is absent.
-    PartnerUserApiKeyCreateRequest:
-      type: object
-      required:
-      - name
-      properties:
-        name:
-          type: string
-          example: user trading key
-        scopes:
-          type: array
-          description: |
-            Optional scopes for the generated user API key. If omitted, the key receives these default scopes:
-            `trade:read`, `trade:order`, `trade:cancel`, `wallet:read`, `positions:read`,
-            `copytrade:read`, `copytrade:manage`, `afk:read`, and `afk:manage`.
-
-            The wildcard scope `*` is not accepted for user API keys. User API key scopes must be one of:
-            `trade:read`, `trade:order`, `trade:cancel`, `wallet:read`, `positions:read`,
-            `copytrade:read`, `copytrade:manage`, `afk:read`, or `afk:manage`.
-
-            `withdraw:create` is not supported for partner user API keys in V1 because withdrawals
-            require account-level TOTP. To enable this permission later, first add a partner-user TOTP binding flow,
-            then add `withdraw:create` to the allowed partner user key scopes.
-          items:
-            type: string
-          example:
-          - trade:order
-          - wallet:read
     Wallet:
       type: object
       required:
@@ -2232,14 +1952,6 @@ components:
           description: Whether to invert copied trade direction. On PATCH this is
             a desired final public state; OpenAPI sends the master toggle flag only
             when the state must change.
-        is_master:
-          type: boolean
-          description: Create-only flag forwarded to master `is_master`; not supported
-            by update config RPC.
-        total_investment:
-          type: string
-          description: Create-only total investment amount. Decimal string forwarded
-            to master `total_investment`.
         only_copy_markets_types:
           "$ref": "#/components/schemas/CopytradeMarketTypesInput"
         keyword_whitelist:
@@ -2504,12 +2216,8 @@ components:
       - config_id
       - target_address
       - status
-      description: Public copytrade config. Mirrors master `CopyTradeConfig`; proto
-        zero `status=0` is exposed as `paused`.
+      description: Public copytrade config. Internal identifiers are not exposed.
       properties:
-        telegram_id:
-          type: string
-          description: Master `telegram_id`.
         config_id:
           type: string
           example: '123'
@@ -2657,14 +2365,6 @@ components:
           type: boolean
           nullable: true
           description: Master `reverse_copy`.
-        is_master:
-          type: boolean
-          nullable: true
-          description: Master `is_master`.
-        total_investment:
-          type: string
-          nullable: true
-          description: Master `total_investment`.
         wallet_address:
           type: string
           nullable: true
@@ -2673,14 +2373,6 @@ components:
           type: string
           nullable: true
           description: Master `proxy_address`.
-        sub_address:
-          type: string
-          nullable: true
-          description: Master `sub_address`.
-        sub_proxy_address:
-          type: string
-          nullable: true
-          description: Master `sub_proxy_address`.
         max_trader_trade_amount:
           type: string
           nullable: true

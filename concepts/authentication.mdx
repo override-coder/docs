@@ -148,15 +148,12 @@ Each API key has scopes that control which endpoints it can call. If the key doe
 | `trade:order` | Place orders |
 | `trade:cancel` | Cancel orders |
 | `wallet:read` | Read wallet balances |
-| `withdraw:create` | Create Polygon withdrawals. This scope is not available for partner user API keys in v1. |
+| `withdraw:create` | Create Polygon withdrawals |
 | `positions:read` | Read positions |
 | `copytrade:read` | Read copytrade configs and records |
 | `copytrade:manage` | Create, update, and delete copytrade configs |
 | `afk:read` | Read AFK strategies and records |
 | `afk:manage` | Create and update AFK strategies |
-| `partner:users:manage` | Partner-level user provisioning |
-| `partner:api_keys:manage` | Partner-level user API key creation |
-| `*` | Full access, **partner keys only**; not permitted for user API keys |
 
 <Note>
   Withdrawals also require a valid TOTP code in the request body. TOTP setup is

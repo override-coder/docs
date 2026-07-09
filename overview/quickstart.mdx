@@ -1,7 +1,7 @@
 ---
 title: "PolyCop OpenAPI Quickstart: Sign and Call the API"
 sidebarTitle: "Quickstart"
-description: "Create an API key, sign a request, and call GET /wallet."
+description: "Receive an API key, sign a request, and call GET /wallet."
 ---
 
 This guide shows the shortest path to a signed `GET /wallet` request.
@@ -10,10 +10,7 @@ This guide shows the shortest path to a signed `GET /wallet` request.
 
 <Step title="Get an API key">
 
-API keys come in two levels: partner keys and user-level keys.
-
-- Partner key: Contact your PolyCop partner manager. Partner keys can provision users and create user-level keys.
-- User-level key: After a user exists, call `POST /partner/users/{user_account_id}/api-keys` to create a key for that user.
+Contact PolyCop to receive an API key for your account. API keys are provisioned outside this public API.
 
 Every API key consists of two parts:
 
@@ -26,7 +23,7 @@ Every API key consists of two parts:
   The `secret` is shown only once. Store it in a secrets manager before you close the response.
 </Warning>
 
-API keys have scopes such as `trade:order` and `wallet:read`. Create the key with the scopes your integration needs.
+API keys have scopes such as `trade:order` and `wallet:read`. Request a key with the scopes your integration needs.
 
 </Step>
 

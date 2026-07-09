@@ -38,7 +38,7 @@ These codes cover problems with your API key credentials or the HMAC signature y
 | Code | HTTP | Meaning | Recommended action |
 |---|---|---|---|
 | `API_KEY_INVALID` | 401 | The `X-API-Key` value was not found | Verify your `X-API-Key` header value |
-| `API_KEY_DISABLED` | 401 | The API key has been disabled or revoked | Create a new key through your partner workflow or contact PolyCop |
+| `API_KEY_DISABLED` | 401 | The API key has been disabled or revoked | Contact PolyCop to rotate or replace the key |
 | `API_KEY_LIMIT_EXCEEDED` | 403 | The API key does not have the scope required for this operation | Request a key with the correct permission scopes |
 | `API_KEY_SIGNATURE_INVALID` | 401 | The HMAC-SHA256 signature does not match the server's calculation | Review your canonical string construction, check field order, newline separators, and body hashing |
 | `API_KEY_TIMESTAMP_EXPIRED` | 401 | The `X-Timestamp` value is outside the allowed ±30 second clock-skew window | Sync your system clock (NTP) and regenerate a fresh timestamp |

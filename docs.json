@@ -140,21 +140,6 @@
       "permanent": true
     },
     {
-      "source": "/api/partner/create-user-api-key",
-      "destination": "/api-reference",
-      "permanent": true
-    },
-    {
-      "source": "/api/partner/create-user",
-      "destination": "/api-reference",
-      "permanent": true
-    },
-    {
-      "source": "/api/partner/list-users",
-      "destination": "/api-reference",
-      "permanent": true
-    },
-    {
       "source": "/api/positions/list-positions",
       "destination": "/api-reference",
       "permanent": true
