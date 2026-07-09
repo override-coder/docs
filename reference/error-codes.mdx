@@ -124,7 +124,7 @@ These codes are returned by partner-only user provisioning and user API key endp
 
 | Code | HTTP | Meaning | Recommended action |
 |---|---|---|---|
-| `PARTNER_USER_WALLET_NOT_READY` | 409 | The partner user's custodial wallet is not initialized yet | Retry `POST /partner/users` with the same `external_user_id`, then create the user API key after `wallet_status` becomes `ready` |
+| `PARTNER_USER_WALLET_NOT_READY` | 409 | The partner user's custodial wallet is not initialized yet | Ask PolyCop to initialize or repair the partner user wallet, then retry after the wallet is ready |
 
 ## Rate limiting
 

@@ -846,7 +846,7 @@ paths:
       - Partner
       summary: List partner users
       operationId: listPartnerUsers
-      description: Requires a partner API key with `partner:users:manage` or `*` scope. Results are ordered by newest partner user first. Use the returned `next_cursor` as the next request's `cursor`.
+      description: Requires a partner API key with `partner:users:manage` or `*` scope. Returns paginated non-sensitive partner user information, including public wallet addresses and recent activity time.
       security:
       - ApiKeyAuth: []
         ApiTimestamp: []
@@ -1305,25 +1305,6 @@ components:
             type: string
             description: API key secret. Shown only once.
             example: sk_xxx
-    PartnerUserCreateRequest:
-      type: object
-      required:
-      - external_user_id
-      properties:
-        external_user_id:
-          type: string
-          description: Partner-side stable user id.
-          maxLength: 128
-          example: user_123
-        display_name:
-          type: string
-          maxLength: 128
-          example: Alice
-        email:
-          type: string
-          format: email
-          maxLength: 255
-          example: alice@example.com
     PartnerUserData:
       type: object
       required:
@@ -1344,8 +1325,11 @@ components:
           example: user_123
         display_name:
           type: string
+          example: Alice
         email:
           type: string
+          format: email
+          example: alice@example.com
         status:
           type: string
           enum:
@@ -1353,11 +1337,20 @@ components:
           - disabled
         wallet_status:
           type: string
-          description: Wallet initialization status for this partner user. `ready` means the user's custodial trading wallet has been initialized; `pending` or `failed` means the partner may retry create-or-get for the same `external_user_id` to initialize the wallet.
           enum:
           - pending
           - ready
           - failed
+        wallet_address:
+          type: string
+          nullable: true
+          description: Public EVM wallet address for the partner user, when available.
+          example: '0x0000000000000000000000000000000000000000'
+        proxy_address:
+          type: string
+          nullable: true
+          description: Public proxy wallet address for the partner user, when available.
+          example: '0x0000000000000000000000000000000000000000'
         wallet_created:
           type: boolean
           nullable: true
@@ -1365,6 +1358,11 @@ components:
           type: string
           format: date-time
           nullable: true
+        last_active_at:
+          type: string
+          format: date-time
+          nullable: true
+          description: Most recent usage time across user API keys created for this partner user.
         created_at:
           type: string
           format: date-time
@@ -1379,11 +1377,79 @@ components:
         items:
           type: array
           items:
-            "$ref": "#/components/schemas/PartnerUserData"
+            "$ref": "#/components/schemas/PartnerUserListItem"
         next_cursor:
           type: string
           nullable: true
           description: Cursor for the next page. It is the last `user_account_id` from the current page; omit it when this field is absent.
+    PartnerUserListItem:
+      type: object
+      required:
+      - partner_account_id
+      - user_account_id
+      - external_user_id
+      - status
+      - wallet_status
+      - created_at
+      properties:
+        partner_account_id:
+          "$ref": "#/components/schemas/AccountId"
+        user_account_id:
+          "$ref": "#/components/schemas/AccountId"
+        external_user_id:
+          type: string
+          example: user_123
+        display_name:
+          type: string
+          example: Alice
+        status:
+          type: string
+          enum:
+          - active
+          - disabled
+        wallet_status:
+          type: string
+          enum:
+          - pending
+          - ready
+          - failed
+        wallet_address:
+          type: string
+          nullable: true
+          description: Public EVM wallet address for the partner user, when available.
+          example: '0x0000000000000000000000000000000000000000'
+        proxy_address:
+          type: string
+          nullable: true
+          description: Public proxy wallet address for the partner user, when available.
+          example: '0x0000000000000000000000000000000000000000'
+        created_at:
+          type: string
+          format: date-time
+        last_active_at:
+          type: string
+          format: date-time
+          nullable: true
+          description: Most recent usage time across user API keys created for this partner user.
+    PartnerUserCreateRequest:
+      type: object
+      required:
+      - external_user_id
+      properties:
+        external_user_id:
+          type: string
+          description: Partner-side stable user id.
+          maxLength: 128
+          example: user_123
+        display_name:
+          type: string
+          maxLength: 128
+          example: Alice
+        email:
+          type: string
+          format: email
+          maxLength: 255
+          example: alice@example.com
     PartnerUserApiKeyCreateRequest:
       type: object
       required:
