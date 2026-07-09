@@ -52,12 +52,5 @@
         "openapi": "openapi.third-party.yaml"
       }
     ]
-  },
-  "navbar": {
-    "primary": {
-      "type": "button",
-      "label": "Get API Key",
-      "href": "https://test-eu.polycopy.fun"
-    }
   }
 }
