@@ -1,13 +1,11 @@
 {
-  "$schema": "https://mintlify.com/docs.json",
-  "name": "Poly Trader OpenAPI",
+  "projectType": "api-service",
+  "projectName": "Poly Trader OpenAPI",
+  "projectDescription": "A third-party REST API for programmatic trading on Poly Trader, secured with API Key + HMAC-SHA256 signatures, supporting wallet management, order placement, positions, copy-trading, and AFK strategies.",
   "theme": "luma",
-  "colors": {
-    "primary": "#ef7025",
-    "light": "#eec9bc",
-    "dark": "#4fa1ab"
-  },
-  "favicon": "/favicon.svg",
+  "primaryColor": "#ef7025",
+  "lightColor": "#eec9bc",
+  "darkColor": "#4fa1ab",
   "navigation": {
     "tabs": [
       {
@@ -102,11 +100,42 @@
       }
     ]
   },
-  "navbar": {
-    "primary": {
-      "type": "button",
-      "label": "Get API Key",
-      "href": "https://test-eu.polycopy.fun"
-    }
-  }
+  "keyFeatures": [
+    "HMAC-SHA256 signed requests with X-API-Key, X-Timestamp, X-Nonce, X-Signature headers",
+    "Partner user provisioning and delegated API key creation",
+    "Custodial wallet balance queries and Polygon withdrawals",
+    "Programmatic order placement, listing, lookup, and cancellation",
+    "Account position queries with market and redeemable filters",
+    "Copytrade configuration management with keyword and market-type filters",
+    "AFK (automated) strategy creation, management, and execution records",
+    "Idempotency-Key support for safe retries on mutations and withdrawals",
+    "Cursor-based pagination for all list endpoints"
+  ],
+  "publicApiSurface": [
+    "GET /partner/users",
+    "POST /partner/users",
+    "POST /partner/users/{user_account_id}/api-keys",
+    "GET /wallet",
+    "POST /wallet/withdraw",
+    "GET /wallet/withdrawals/{withdraw_id}",
+    "POST /orders",
+    "GET /orders",
+    "GET /orders/{order_id}",
+    "DELETE /orders/{order_id}",
+    "GET /positions",
+    "GET /copytrade/configs",
+    "POST /copytrade/configs",
+    "GET /copytrade/configs/{config_id}",
+    "PATCH /copytrade/configs/{config_id}",
+    "DELETE /copytrade/configs/{config_id}",
+    "POST /copytrade/configs/{config_id}/keywords",
+    "DELETE /copytrade/configs/{config_id}/keywords/{key_word_id}",
+    "PATCH /copytrade/configs/{config_id}/market-types",
+    "GET /copytrade/records",
+    "GET /afk/strategies",
+    "POST /afk/strategies",
+    "GET /afk/strategies/{strategy_id}",
+    "PATCH /afk/strategies/{strategy_id}",
+    "GET /afk/records"
+  ]
 }

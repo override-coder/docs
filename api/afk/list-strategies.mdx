@@ -1,0 +1,125 @@
+---
+title: "GET /afk/strategies — List AFK Trading Strategies"
+sidebarTitle: "List Strategies"
+description: "Retrieve all AFK automated trading strategies owned by your account. Each strategy defines automated trade rules including market, direction, and risk parameters."
+---
+
+This endpoint returns all AFK automated trading strategies owned by your account. AFK strategies execute trades automatically based on the rules you define — market filters, price ranges, technical indicators, and profit/loss triggers. You can use the returned `config_id` values to retrieve, update, or review execution records for individual strategies. Requires the `afk:read` scope.
+
+## Request
+
+```http
+GET /afk/strategies
+```
+
+**Base URL:** `https://test-eu.polycopy.fun/openapi/v1`
+
+**Required scope:** `afk:read`
+
+<Note>
+  All requests must include the four HMAC-signed authentication headers: `X-API-Key`, `X-Timestamp`, `X-Nonce`, and `X-Signature`.
+</Note>
+
+## Response Fields
+
+All strategies are returned inside `data.items`. Each element is an AFKStrategy object with the fields below.
+
+<ResponseField name="data" type="object">
+  <Expandable title="data fields" defaultOpen>
+    <ResponseField name="items" type="array">
+      List of AFKStrategy objects owned by your account.
+      <Expandable title="AFKStrategy fields">
+        <ResponseField name="config_id" type="string">
+          Unique strategy identifier. Use this value as `strategy_id` in the Get, Update, and Records endpoints.
+        </ResponseField>
+        <ResponseField name="status" type="string">
+          Current strategy status. One of `running`, `paused`, or `disabled`.
+        </ResponseField>
+        <ResponseField name="tag" type="string">
+          Human-readable label you assigned to this strategy.
+        </ResponseField>
+        <ResponseField name="market" type="string">
+          Market identifier the strategy trades on (e.g., `crypto_btc`).
+        </ResponseField>
+        <ResponseField name="side" type="integer">
+          Trade direction. `1` = Up (buy outcome), `2` = Down (sell outcome).
+        </ResponseField>
+        <ResponseField name="buy_amount" type="string">
+          Buy amount per AFK order, expressed as a decimal string.
+        </ResponseField>
+        <ResponseField name="min_price" type="string">
+          Minimum price threshold. The strategy will not execute orders below this price.
+        </ResponseField>
+        <ResponseField name="max_price" type="string">
+          Maximum price threshold. The strategy will not execute orders above this price.
+        </ResponseField>
+        <ResponseField name="slippage" type="string">
+          Accepted slippage percentage for market orders (e.g., `"2"` = 2%).
+        </ResponseField>
+        <ResponseField name="take_profit_percentage" type="string">
+          Percentage gain at which the strategy triggers a take-profit exit.
+        </ResponseField>
+        <ResponseField name="take_profit_price" type="string">
+          Absolute price level at which the strategy triggers a take-profit exit.
+        </ResponseField>
+        <ResponseField name="stop_loss_percentage" type="string">
+          Percentage loss at which the strategy triggers a stop-loss exit.
+        </ResponseField>
+        <ResponseField name="stop_loss_price" type="string">
+          Absolute price level at which the strategy triggers a stop-loss exit.
+        </ResponseField>
+        <ResponseField name="use_kdj" type="integer">
+          KDJ indicator switch. `0` = off, `1` = on.
+        </ResponseField>
+        <ResponseField name="use_macd" type="integer">
+          MACD indicator switch. `0` = off, `1` = on.
+        </ResponseField>
+        <ResponseField name="use_atr" type="integer">
+          ATR indicator switch. `0` = off, `1` = on.
+        </ResponseField>
+        <ResponseField name="created_at" type="datetime | null">
+          ISO 8601 timestamp of when the strategy was created. May be `null` for legacy strategies.
+        </ResponseField>
+      </Expandable>
+    </ResponseField>
+  </Expandable>
+</ResponseField>
+
+## Example Request
+
+```bash
+curl -X GET "https://test-eu.polycopy.fun/openapi/v1/afk/strategies" \
+  -H "X-API-Key: pk_your_key_id" \
+  -H "X-Timestamp: 1717200000" \
+  -H "X-Nonce: abc123" \
+  -H "X-Signature: <signature>"
+```
+
+## Example Response
+
+```json
+{
+  "code": "OK",
+  "message": "success",
+  "data": {
+    "items": [
+      {
+        "config_id": "42",
+        "status": "running",
+        "tag": "BTC Up Strategy",
+        "market": "crypto_btc",
+        "side": 1,
+        "buy_amount": "10",
+        "min_price": "0.1",
+        "max_price": "0.9",
+        "slippage": "2",
+        "use_kdj": 1,
+        "use_macd": 0,
+        "use_atr": 0,
+        "created_at": "2024-06-01T12:00:00Z"
+      }
+    ]
+  },
+  "request_id": "req_202606011200000001"
+}
+```

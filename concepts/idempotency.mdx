@@ -1,0 +1,132 @@
+---
+title: "Idempotency Keys for Safe Retries"
+sidebarTitle: "Idempotency"
+description: "Use Idempotency-Key to safely retry failed requests without duplicate side effects. Required for withdrawals, optional for other mutation endpoints."
+---
+
+Network failures, timeouts, and intermittent errors are a fact of distributed systems. The `Idempotency-Key` header lets you retry a failed or timed-out request without risking duplicate side effects — for example, placing the same order twice or sending the same withdrawal twice. The server records the outcome of the first successfully processed request and returns that same cached response to any subsequent request that carries the same key, without re-executing the operation.
+
+## How it works
+
+<Steps>
+  <Step title="Generate a unique key">
+    Before sending a mutation request, generate a unique `Idempotency-Key`
+    string (max 128 characters) and attach it as a request header. Store this
+    key alongside your operation record so you can use it again on retry.
+  </Step>
+  <Step title="Send the request">
+    The server processes the request normally. If the operation succeeds, the
+    server stores the response alongside your idempotency key.
+  </Step>
+  <Step title="On failure or timeout, retry">
+    Resend the request with the **same** `Idempotency-Key`. Generate fresh
+    values for `X-Timestamp`, `X-Nonce`, and `X-Signature` — signature headers
+    are not idempotent and must always be refreshed (see
+    [Authentication](/concepts/authentication)).
+  </Step>
+  <Step title="Server returns the cached response">
+    If the server already processed a request with that key, it returns the
+    original cached response without executing the operation again.
+  </Step>
+</Steps>
+
+<Warning>
+  If you retry with the same `Idempotency-Key` but a **different request
+  body**, the server rejects the request with a `CONFLICT` error. An
+  idempotency key is permanently bound to the first request body it was used
+  with.
+</Warning>
+
+## When to use it
+
+### Required
+
+The following endpoint **requires** an `Idempotency-Key` header. Omitting it returns an error:
+
+| Endpoint | Notes |
+|---|---|
+| `POST /wallet/withdraw` | Use a stable business identifier tied to the withdrawal, e.g. your internal withdrawal ID (`withdrawal-{your_internal_id}`). |
+
+### Optional (strongly recommended)
+
+The following mutation endpoints accept an optional `Idempotency-Key`. Version 1 does not reject requests that omit it, but using it is strongly recommended for all state-changing operations to protect against duplicate execution on retry:
+
+| Endpoint | Description |
+|---|---|
+| `POST /orders` | Place an order |
+| `DELETE /orders/{order_id}` | Cancel an order |
+| `POST /copytrade/configs` | Create a copytrade config |
+| `PATCH /copytrade/configs/{config_id}` | Update a copytrade config |
+| `DELETE /copytrade/configs/{config_id}` | Disable a copytrade config |
+| `POST /copytrade/configs/{config_id}/keywords` | Add a keyword to a copytrade config |
+| `DELETE /copytrade/configs/{config_id}/keywords/{key_word_id}` | Delete a keyword from a copytrade config |
+| `PATCH /copytrade/configs/{config_id}/market-types` | Update market types for a copytrade config |
+| `POST /afk/strategies` | Create an AFK strategy |
+| `PATCH /afk/strategies/{strategy_id}` | Update an AFK strategy |
+
+## Key format
+
+<ParamField header="Idempotency-Key" type="string">
+  A unique string of up to **128 characters** that identifies this logical
+  business operation. The recommended format is a UUID v4
+  (`550e8400-e29b-41d4-a716-446655440000`) or a stable business identifier such
+  as `withdrawal-{your_internal_id}`.
+</ParamField>
+
+## Code examples
+
+<CodeGroup>
+
+```typescript TypeScript
+import { randomUUID } from 'crypto';
+
+const idempotencyKey = randomUUID(); // e.g. '550e8400-e29b-41d4-a716-446655440000'
+
+await fetch('https://test-eu.polycopy.fun/openapi/v1/wallet/withdraw', {
+  method: 'POST',
+  headers: {
+    'X-API-Key': keyId,
+    'X-Timestamp': timestamp,
+    'X-Nonce': nonce,
+    'X-Signature': signature,
+    'Idempotency-Key': idempotencyKey,
+    'Content-Type': 'application/json',
+  },
+  body: JSON.stringify(withdrawalPayload),
+});
+```
+
+```python Python
+import uuid
+import requests
+
+idempotency_key = str(uuid.uuid4())
+
+response = requests.post(
+    'https://test-eu.polycopy.fun/openapi/v1/wallet/withdraw',
+    headers={
+        'X-API-Key': key_id,
+        'X-Timestamp': timestamp,
+        'X-Nonce': nonce,
+        'X-Signature': signature,
+        'Idempotency-Key': idempotency_key,
+        'Content-Type': 'application/json',
+    },
+    json=withdrawal_payload,
+)
+```
+
+</CodeGroup>
+
+## Best practices
+
+- **Use UUID v4 or stable business identifiers.** A UUID v4 is cryptographically random and collision-resistant. For withdrawals, a stable business ID (e.g., `withdrawal-{your_internal_id}`) is preferable because you can reconstruct it deterministically even after a process restart.
+- **One key per logical operation.** Never reuse a key for a different operation — the key is permanently bound to the first request body it was submitted with. Reusing it for a different operation will return the old cached response or a `CONFLICT` error.
+- **Store the key with your record.** Persist the idempotency key alongside the operation in your database before you send the request. This ensures you can always retrieve it and retry reliably, even if your process crashes between the write and the network call.
+- **Always refresh signature headers on retry.** The `Idempotency-Key` stays the same across retries, but `X-Timestamp`, `X-Nonce`, and `X-Signature` must be regenerated for each attempt. See [Authentication](/concepts/authentication) for details.
+
+<Tip>
+  A common pattern is to derive the idempotency key from your own database
+  primary key: `order-{uuid}`, `withdrawal-{uuid}`. This makes the key
+  deterministic and eliminates any risk of losing it between retries.
+</Tip>

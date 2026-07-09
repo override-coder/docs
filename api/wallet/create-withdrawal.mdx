@@ -1,0 +1,118 @@
+---
+title: "POST /wallet/withdraw — Create a Polygon Withdrawal"
+sidebarTitle: "Create Withdrawal"
+description: "Initiate a USDC/USDT/PUSD withdrawal to a Polygon address. Requires TOTP, a mandatory Idempotency-Key, and wallet_status=ready."
+---
+
+Use this endpoint to withdraw tokens from your custodial wallet to an external Polygon address. Each withdrawal request must include a valid TOTP code and a mandatory `Idempotency-Key` header. You must authenticate with a key that carries the `withdraw:create` scope.
+
+## Request
+
+```
+POST https://test-eu.polycopy.fun/openapi/v1/wallet/withdraw
+```
+
+### Required Scope
+
+`withdraw:create`
+
+<Note>
+  The `withdraw:create` scope is not available for partner user API keys in v1. Only partner-level or account-level API keys may initiate withdrawals.
+</Note>
+
+### Rate Limit
+
+5 requests per minute per account.
+
+### Concurrency Rule
+
+Only one unfinished withdrawal may exist per account at a time. A new withdrawal can only be submitted after the previous one has reached a terminal state of `succeeded` or `failed`. Withdrawals in `processing`, `submitting`, or `submitted` states are considered unfinished.
+
+### Required Header
+
+| Header | Type | Description |
+|--------|------|-------------|
+| `Idempotency-Key` | string (max 128 chars) | A unique key you generate for this withdrawal attempt. Reusing the same `Idempotency-Key` with a different request body returns a `CONFLICT` error. |
+
+### Request Body
+
+<ParamField body="network" type="string" required>
+  The target blockchain network. Must be `polygon`.
+</ParamField>
+
+<ParamField body="token" type="string" required>
+  The contract address of the token you wish to withdraw. Must be one of the four supported tokens:
+
+  | Token | Contract Address |
+  |-------|-----------------|
+  | USDC | `0x3c499c542cEF5E3811e1192ce70d8cC03d5c3359` |
+  | USDC.e | `0x2791Bca1f2de4661ED88A30C99A7a9449Aa84174` |
+  | USDT | `0xc2132D05D31c914a87C6611C10748AEb04B58e8F` |
+  | PUSD | `0xC011a7E12a19f7B1f670d46F03B03f3342E82DFB` |
+</ParamField>
+
+<ParamField body="amount" type="string" required>
+  The amount to withdraw, expressed as a decimal string (e.g. `"10.50"`).
+</ParamField>
+
+<ParamField body="destination" type="string" required>
+  The target Polygon wallet address to which the funds will be sent.
+</ParamField>
+
+<ParamField body="totp_code" type="string" required>
+  A 6-digit TOTP code from your authenticator app. This is required to authorize every withdrawal.
+</ParamField>
+
+## Withdrawal Status Lifecycle
+
+A withdrawal moves through the following states after creation:
+
+```
+processing → submitting → submitted → succeeded
+                                    ↘ failed
+```
+
+The states `processing`, `submitting`, and `submitted` are all considered **unfinished**. Poll `GET /wallet/withdrawals/{withdraw_id}` until the withdrawal reaches `succeeded` or `failed`.
+
+<Note>
+  When retrying a failed network request, reuse the **same** `Idempotency-Key` and request body. Generate fresh values for `X-Timestamp`, `X-Nonce`, and `X-Signature` in the retry's headers, as those are time-sensitive. The server uses the `Idempotency-Key` to deduplicate the withdrawal itself.
+</Note>
+
+## Response
+
+All responses use the standard envelope: `code`, `message`, `data`, and `request_id`. The `data` object contains the fields described below.
+
+<ResponseField name="withdraw_id" type="string">
+  The unique identifier for this withdrawal (e.g. `wd_202606011200000001`). Use this ID to poll the withdrawal status.
+</ResponseField>
+
+<ResponseField name="status" type="string">
+  The initial status of the withdrawal. Will be `processing` immediately after creation.
+</ResponseField>
+
+## Example Request
+
+```bash
+curl -X POST "https://test-eu.polycopy.fun/openapi/v1/wallet/withdraw" \
+  -H "X-API-Key: pk_your_key_id" \
+  -H "X-Timestamp: 1717200000" \
+  -H "X-Nonce: abc123" \
+  -H "X-Signature: <signature>" \
+  -H "Idempotency-Key: withdrawal-uuid-here" \
+  -H "Content-Type: application/json" \
+  -d '{"network": "polygon", "token": "0x2791Bca1f2de4661ED88A30C99A7a9449Aa84174", "amount": "10.50", "destination": "0xRecipientAddress", "totp_code": "123456"}'
+```
+
+## Example Response
+
+```json
+{
+  "code": "OK",
+  "message": "success",
+  "data": {
+    "withdraw_id": "wd_202606011200000001",
+    "status": "processing"
+  },
+  "request_id": "req_202606011200000001"
+}
+```

@@ -1,0 +1,185 @@
+---
+title: "POST /orders — Place a Prediction Market Order"
+sidebarTitle: "Place Order"
+description: "Submit a buy or sell order on a prediction market asset. Supports market and limit orders, sell-all, and partial sell by percentage."
+---
+
+Use this endpoint to place a buy or sell order against a prediction market asset. You can submit market orders (by omitting `price`) or limit orders (by supplying a `price`). For sell-side workflows, you may specify an exact `size`, use `sell_all` to close an entire position, or use `sell_percentage` to sell a fractional portion. This endpoint requires the `trade:order` scope. To make a request safely retriable, supply an `Idempotency-Key` header — the server will return the same response for any duplicate request that shares the same key.
+
+## Request
+
+**`POST /orders`**
+
+**Base URL:** `https://test-eu.polycopy.fun/openapi/v1`
+
+**Required scope:** `trade:order`
+
+### Authentication Headers
+
+All requests must include the following HMAC-signed headers:
+
+| Header | Type | Description |
+|---|---|---|
+| `X-API-Key` | string | Your API key identifier |
+| `X-Timestamp` | string | Unix timestamp of the request |
+| `X-Nonce` | string | Unique nonce string for this request |
+| `X-Signature` | string | HMAC signature computed over the request |
+
+### Optional Header
+
+<ParamField header="Idempotency-Key" type="string">
+  A unique key (max 128 characters) that makes this request safely retriable. If the server has already processed a request with this key, it returns the original response without placing a duplicate order.
+</ParamField>
+
+### Request Body
+
+<ParamField body="asset" type="string" required>
+  The asset or token identifier to trade (e.g., a contract address like `0xasset_address`).
+</ParamField>
+
+<ParamField body="side" type="string" required>
+  The order direction. Must be either `buy` or `sell`.
+</ParamField>
+
+<ParamField body="amount_usd" type="string">
+  The USD notional amount to spend on a buy order (e.g., `"10"`). Use this field for buy-side orders. Provide as a decimal string.
+</ParamField>
+
+<ParamField body="price" type="string">
+  The limit price as a decimal string (e.g., `"0.55"`). Omit this field to submit a market order. If supplied, the order will only fill at the specified price or better.
+</ParamField>
+
+<ParamField body="size" type="string">
+  The asset quantity to sell. Use this field for sell orders when you want to specify an exact position size.
+</ParamField>
+
+<ParamField body="expiration" type="integer">
+  The Unix timestamp (in seconds) at which the order expires. Applicable to limit orders. If omitted, the order remains open until filled or canceled.
+</ParamField>
+
+<ParamField body="sell_all" type="boolean" default="false">
+  When set to `true`, the entire position in the specified asset is sold. Mutually exclusive with `sell_percentage`.
+</ParamField>
+
+<ParamField body="sell_percentage" type="string">
+  The percentage of your current position to sell, expressed as a string (e.g., `"50"` for 50%). Mutually exclusive with `sell_all`.
+</ParamField>
+
+<ParamField body="metadata" type="object">
+  Optional metadata about the market associated with this order. Useful for record-keeping and display purposes.
+
+  <Expandable title="metadata fields">
+    <ParamField body="metadata.title" type="string">
+      The human-readable market title.
+    </ParamField>
+
+    <ParamField body="metadata.slug" type="string">
+      The URL-friendly market slug.
+    </ParamField>
+
+    <ParamField body="metadata.condition_id" type="string">
+      The condition ID that identifies the prediction market contract.
+    </ParamField>
+
+    <ParamField body="metadata.outcome" type="string">
+      The outcome label this order is trading (e.g., `"Yes"` or `"No"`).
+    </ParamField>
+  </Expandable>
+</ParamField>
+
+## Response
+
+All responses use the standard envelope. On success, the `data` object contains the following fields:
+
+<ResponseField name="order_id" type="string">
+  The unique identifier assigned to the placed order.
+</ResponseField>
+
+<ResponseField name="filled" type="boolean">
+  Indicates whether the order was immediately and fully filled at submission time. If `false`, the order remains open or partially open.
+</ResponseField>
+
+<ResponseField name="tx_hash" type="string">
+  The on-chain transaction hash associated with the order execution.
+</ResponseField>
+
+<ResponseField name="sell_size" type="string">
+  The effective sell size used when the order was executed. This may differ from the requested `size` for percentage-based or sell-all orders.
+</ResponseField>
+
+## Error Codes
+
+| Code | Description |
+|---|---|
+| `ORDER_PLACE_FAILED` | The order could not be placed due to an internal or exchange-side error. |
+| `ORDER_INSUFFICIENT_BALANCE` | Your account does not have sufficient balance to cover this order. |
+| `VALIDATION_FAILED` | One or more request fields failed validation (e.g., missing required field, invalid type). |
+
+## Examples
+
+### Market Buy Order
+
+Submit a market buy order spending $10 USD on an asset:
+
+```bash
+curl -X POST "https://test-eu.polycopy.fun/openapi/v1/orders" \
+  -H "X-API-Key: pk_your_key_id" \
+  -H "X-Timestamp: 1717200000" \
+  -H "X-Nonce: abc123" \
+  -H "X-Signature: <signature>" \
+  -H "Idempotency-Key: order-uuid-here" \
+  -H "Content-Type: application/json" \
+  -d '{"asset": "0xasset_address", "side": "buy", "amount_usd": "10"}'
+```
+
+**Response:**
+
+```json
+{
+  "code": "OK",
+  "message": "success",
+  "data": {
+    "order_id": "0xorder_id_here",
+    "filled": true,
+    "tx_hash": "0xtx_hash_here",
+    "sell_size": ""
+  },
+  "request_id": "req_202606011200000001"
+}
+```
+
+### Limit Buy Order
+
+Submit a limit buy order with a specific price:
+
+```bash
+curl -X POST "https://test-eu.polycopy.fun/openapi/v1/orders" \
+  -H "X-API-Key: pk_your_key_id" \
+  -H "X-Timestamp: 1717200000" \
+  -H "X-Nonce: abc123" \
+  -H "X-Signature: <signature>" \
+  -H "Content-Type: application/json" \
+  -d '{"asset": "0xasset_address", "side": "buy", "amount_usd": "10", "price": "0.55"}'
+```
+
+### Sell All
+
+Close your entire position in an asset:
+
+```bash
+curl -X POST "https://test-eu.polycopy.fun/openapi/v1/orders" \
+  -H "X-API-Key: pk_your_key_id" \
+  -H "X-Timestamp: 1717200000" \
+  -H "X-Nonce: abc123" \
+  -H "X-Signature: <signature>" \
+  -H "Content-Type: application/json" \
+  -d '{"asset": "0xasset_address", "side": "sell", "sell_all": true}'
+```
+
+<Tip>
+  Use the `Idempotency-Key` header on all order placements. If your request times out or the connection drops, you can safely retry with the same key without risking a duplicate order.
+</Tip>
+
+<Warning>
+  Market orders execute immediately at the best available price. Ensure your account holds sufficient balance before submitting, as the order may fail with `ORDER_INSUFFICIENT_BALANCE` if funds are unavailable.
+</Warning>

@@ -1,0 +1,143 @@
+---
+title: "Poly Trader OpenAPI Error Codes Reference"
+sidebarTitle: "Error Codes"
+description: "Complete list of Poly Trader OpenAPI error codes, their HTTP status codes, and recommended handling strategies for each error type."
+---
+
+Every error response from the Poly Trader OpenAPI returns a consistent JSON envelope that always includes a `code` field containing a machine-readable uppercase string. You should branch your error-handling logic on `code` rather than on the HTTP status alone, because multiple distinct error conditions can share the same HTTP status code. The sections below list every possible `code` value, its associated HTTP status, what it means, and the recommended action you should take.
+
+## General errors
+
+These codes cover request-level problems that can occur on any endpoint.
+
+| Code | HTTP | Meaning | Recommended action |
+|---|---|---|---|
+| `OK` | 200 | Request succeeded | — |
+| `BAD_REQUEST` | 400 | The request is malformed or missing required fields | Fix the request before retrying |
+| `UNAUTHORIZED` | 401 | Authentication failed | Check your headers and signature |
+| `NOT_FOUND` | 404 | The requested resource does not exist | Verify the resource ID |
+| `VALIDATION_FAILED` | 422 | The request body failed schema validation | Correct the invalid body fields and retry |
+| `CONFLICT` | 409 | Conflict, e.g. a duplicate idempotency key submitted with a different body | Check your request for duplicate keys |
+| `RATE_LIMITED` | 429 | Too many requests | Wait for the `Retry-After` header value and then retry |
+| `INTERNAL_ERROR` | 500 | Unexpected server-side error | Retry with exponential backoff |
+| `MASTER_UNAVAILABLE` | 502 | An upstream service is unavailable | Retry with exponential backoff |
+
+## Account errors
+
+These codes are returned when the issue is specific to the state of your account.
+
+| Code | HTTP | Meaning | Recommended action |
+|---|---|---|---|
+| `ACCOUNT_DISABLED` | 403 | Your account has been disabled | Contact support |
+| `ACCOUNT_NOT_FOUND` | 404 | The account does not exist | Verify the account ID |
+
+## API key errors
+
+These codes cover problems with your API key credentials or the HMAC signature you computed.
+
+| Code | HTTP | Meaning | Recommended action |
+|---|---|---|---|
+| `API_KEY_INVALID` | 401 | The `X-API-Key` value was not found | Verify your `X-API-Key` header value |
+| `API_KEY_DISABLED` | 401 | The API key has been disabled or revoked | Generate a new key from your account dashboard |
+| `API_KEY_LIMIT_EXCEEDED` | 403 | The API key does not have the scope required for this operation | Request a key with the correct permission scopes |
+| `API_KEY_SIGNATURE_INVALID` | 401 | The HMAC-SHA256 signature does not match the server's calculation | Review your canonical string construction — check field order, newline separators, and body hashing |
+| `API_KEY_TIMESTAMP_EXPIRED` | 401 | The `X-Timestamp` value is outside the allowed ±30 second clock-skew window | Sync your system clock (NTP) and regenerate a fresh timestamp |
+| `API_KEY_NONCE_REPLAYED` | 401 | The nonce value has already been seen within the current time window | Generate a new cryptographically random nonce for every request |
+
+<Warning>
+  `API_KEY_SIGNATURE_INVALID` is the most common integration error. The three
+  most frequent root causes are: (1) using the **short path** (e.g. `/wallet`)
+  instead of the **full path** (e.g. `/openapi/v1/wallet`) in the canonical
+  string, (2) hashing the body **after** sending it instead of hashing the
+  exact bytes you will send, and (3) using escaped `\n` characters in the
+  canonical string instead of real newline bytes. See the
+  [Signing Examples](/examples/signing) page for copy-paste reference
+  implementations.
+</Warning>
+
+## TOTP errors
+
+These codes are returned by endpoints that require two-factor authentication (withdrawal, for example).
+
+| Code | HTTP | Meaning | Recommended action |
+|---|---|---|---|
+| `TOTP_NOT_ENABLED` | 403 | Your account does not have TOTP configured | Enable TOTP in your account security settings before making withdrawal requests |
+| `TOTP_CODE_INVALID` | 403 | The TOTP code you provided is incorrect | Provide a valid current 6-digit TOTP code |
+| `TOTP_CODE_REPLAYED` | 403 | This TOTP code has already been used | Wait for the next 30-second TOTP window and provide a fresh code |
+| `TOTP_TOO_MANY_FAILURES` | 403 | Too many consecutive TOTP failures | Wait before retrying to avoid a temporary lockout |
+
+## Order errors
+
+These codes are returned by the `/orders` endpoints.
+
+| Code | HTTP | Meaning | Recommended action |
+|---|---|---|---|
+| `ORDER_PLACE_FAILED` | 422 | The order could not be placed | Check your order parameters (asset address, side, amount) |
+| `ORDER_CANCEL_FAILED` | 422 | The cancel request failed | Verify the current status of the order before retrying |
+| `ORDER_NOT_FOUND` | 404 | The order does not exist or belongs to a different account | Verify your `order_id` value |
+| `ORDER_INSUFFICIENT_BALANCE` | 422 | Your wallet balance is too low to fill the order | Top up your wallet balance |
+| `ORDER_RESULT_UNKNOWN` | 500 | The order was submitted but the outcome is unknown | Poll `GET /orders/{order_id}` to check the order status before retrying |
+
+<Note>
+  When you receive `ORDER_RESULT_UNKNOWN`, do **not** immediately retry placing
+  the same order — you may end up with duplicate positions. Always poll
+  `GET /orders/{order_id}` first to confirm the outcome.
+</Note>
+
+## Withdrawal errors
+
+These codes are returned by the `/wallet/withdrawals` endpoints.
+
+| Code | HTTP | Meaning | Recommended action |
+|---|---|---|---|
+| `WITHDRAW_2FA_REQUIRED` | 403 | TOTP verification is required for withdrawals | Include a valid `totp_code` field in your request body |
+| `WITHDRAW_NETWORK_UNSUPPORTED` | 422 | The specified network is not supported | Only Polygon (`polygon`) is supported in v1 |
+| `WITHDRAW_TOKEN_UNSUPPORTED` | 422 | The token contract address is not supported | Use one of the four supported token contract addresses listed in the API reference |
+| `WITHDRAW_ADDRESS_INVALID` | 422 | The destination address is not a valid Polygon address | Verify the address format (EIP-55 checksummed or lowercase hex) |
+| `WITHDRAW_AMOUNT_INVALID` | 422 | The withdrawal amount is invalid or below the minimum | Check the amount format and minimum withdrawal threshold |
+| `WITHDRAW_CREATE_FAILED` | 422 | Withdrawal creation failed | Retry using a fresh idempotency key |
+| `WITHDRAW_NOT_FOUND` | 404 | The withdrawal ID was not found | Verify your `withdraw_id` value |
+| `WITHDRAW_RESULT_UNKNOWN` | 500 | The withdrawal was submitted but the outcome is unknown | Poll `GET /wallet/withdrawals/{withdraw_id}` to check status before retrying |
+
+<Warning>
+  Only **one active withdrawal** per account is allowed at a time. A withdrawal
+  is considered active while its status is `processing`, `submitting`, or
+  `submitted`. Attempting to create a second withdrawal while one is active will
+  result in a `WITHDRAW_CREATE_FAILED` error.
+</Warning>
+
+## Copytrade errors
+
+These codes are returned by the `/copytrade` endpoints.
+
+| Code | HTTP | Meaning | Recommended action |
+|---|---|---|---|
+| `COPYTRADE_CONFIG_NOT_FOUND` | 404 | The config does not exist or belongs to a different account | Verify your `config_id` value |
+| `COPYTRADE_CONFIG_INVALID` | 422 | One or more config parameters are invalid | Review the config fields in your request against the API reference |
+| `COPYTRADE_CREATE_FAILED` | 422 | Config creation failed | Retry with corrected parameters |
+| `COPYTRADE_UPDATE_FAILED` | 422 | Config update failed | Retry with corrected parameters |
+
+## Rate limiting
+
+When you exceed a rate limit the server returns HTTP `429` with the code `RATE_LIMITED`. The response includes four headers that tell you exactly when you can retry:
+
+| Header | Description |
+|---|---|
+| `Retry-After` | Number of seconds you must wait before sending another request |
+| `X-RateLimit-Limit` | The effective request limit for the rate-limited bucket |
+| `X-RateLimit-Remaining` | Remaining requests in the current window (typically `0` on a 429 response) |
+| `X-RateLimit-Reset` | Seconds until the current rate-limit bucket resets |
+
+<Note>
+  The withdrawal endpoint (`POST /wallet/withdrawals`) has a dedicated rate
+  limit of **5 requests per minute per account**, which is stricter than the
+  general API rate limit. Build your retry logic to respect the `Retry-After`
+  value from the response rather than using a fixed back-off interval.
+</Note>
+
+<Tip>
+  A robust implementation should treat any `429` response as a signal to pause
+  **all** requests to the API (not just the one that was rate-limited), wait
+  for the number of seconds in `Retry-After`, and then resume with a
+  short exponential back-off to avoid immediately re-triggering the limit.
+</Tip>

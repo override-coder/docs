@@ -1,0 +1,115 @@
+---
+title: "GET /orders/{order_id} — Get Order Details"
+sidebarTitle: "Get Order"
+description: "Retrieve a single order by its master order ID. Returns ORDER_NOT_FOUND if the order does not exist or belongs to another account."
+---
+
+Use this endpoint to retrieve the full details of a single order by its master order ID. If the order does not exist, or if it belongs to a different account than the one authenticated by your API key, the response returns an `ORDER_NOT_FOUND` error. This endpoint requires the `trade:read` scope.
+
+## Request
+
+**`GET /orders/{order_id}`**
+
+**Base URL:** `https://test-eu.polycopy.fun/openapi/v1`
+
+**Required scope:** `trade:read`
+
+### Authentication Headers
+
+All requests must include the following HMAC-signed headers:
+
+| Header | Type | Description |
+|---|---|---|
+| `X-API-Key` | string | Your API key identifier |
+| `X-Timestamp` | string | Unix timestamp of the request |
+| `X-Nonce` | string | Unique nonce string for this request |
+| `X-Signature` | string | HMAC signature computed over the request |
+
+### Path Parameters
+
+<ParamField path="order_id" type="string" required>
+  The master order ID of the order you want to retrieve (e.g., `0xorder_id_here`).
+</ParamField>
+
+### Query Parameters
+
+<ParamField query="address" type="string">
+  Filter by wallet address. Useful when your API key is authorized across multiple addresses.
+</ParamField>
+
+<ParamField query="locale" type="string">
+  A locale code used to return market titles in the specified language (e.g., `en`). When omitted, titles are returned in their default language.
+</ParamField>
+
+## Response
+
+All responses use the standard envelope. On success, the `data` object contains the details of the requested order:
+
+<ResponseField name="order_id" type="string">
+  The unique identifier for the order.
+</ResponseField>
+
+<ResponseField name="status" type="string">
+  The current status of the order: `open`, `filled`, `canceled`, `failed`, or `unknown`.
+</ResponseField>
+
+<ResponseField name="asset" type="string">
+  The asset or token identifier this order was placed against.
+</ResponseField>
+
+<ResponseField name="side" type="string">
+  The order direction: `buy` or `sell`.
+</ResponseField>
+
+<ResponseField name="price" type="string | null">
+  The limit price at which the order was placed, as a decimal string. `null` for market orders.
+</ResponseField>
+
+<ResponseField name="size" type="string | null">
+  The asset quantity of the order. `null` if not yet determined.
+</ResponseField>
+
+<ResponseField name="created_at" type="string | null">
+  The ISO 8601 timestamp indicating when the order was created. `null` if unavailable.
+</ResponseField>
+
+## Error Codes
+
+| Code | Description |
+|---|---|
+| `ORDER_NOT_FOUND` | No order was found with the given ID, or the order belongs to a different account. |
+
+## Example
+
+### Get a Specific Order
+
+```bash
+curl -X GET "https://test-eu.polycopy.fun/openapi/v1/orders/0xorder_id_here" \
+  -H "X-API-Key: pk_your_key_id" \
+  -H "X-Timestamp: 1717200000" \
+  -H "X-Nonce: abc123" \
+  -H "X-Signature: <signature>"
+```
+
+**Response:**
+
+```json
+{
+  "code": "OK",
+  "message": "success",
+  "data": {
+    "order_id": "0xorder_id_here",
+    "status": "open",
+    "asset": "0xasset_address",
+    "side": "buy",
+    "price": "0.55",
+    "size": "18.18",
+    "created_at": "2024-06-01T12:00:00Z"
+  },
+  "request_id": "req_202606011200000001"
+}
+```
+
+<Note>
+  `ORDER_NOT_FOUND` is returned both when the order ID genuinely does not exist and when it belongs to another account. This is by design to prevent information leakage about orders on the platform.
+</Note>

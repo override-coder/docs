@@ -1,0 +1,136 @@
+---
+title: "Get Started with Poly Trader OpenAPI"
+sidebarTitle: "Quickstart"
+description: "Learn how to get an API key, sign a request with HMAC-SHA256, and make your first call to GET /wallet in under 10 minutes."
+---
+
+This guide walks you through the minimum steps needed to authenticate with Poly Trader OpenAPI and make your first successful request. By the end you will have obtained an API key, signed a request using HMAC-SHA256, and retrieved your wallet details from `GET /wallet`.
+
+<Steps>
+
+<Step title="Get an API key">
+
+API keys come in two levels: partner keys and user-level keys.
+
+- **Partner key** — Contact your Poly Trader partner manager to receive a partner API key. This key lets you perform partner-level operations, including provisioning users and creating user-level keys on their behalf.
+- **User-level key** — Once a user has been provisioned, use the Partner API endpoint `POST /partner/users/{user_account_id}/api-keys` to create an API key for that user.
+
+Every API key consists of two parts:
+
+| Part | Prefix | Description |
+|---|---|---|
+| `key_id` | `pk_` | The public identifier sent in the `X-API-Key` header |
+| `secret` | `sk_` | The private secret used to sign requests |
+
+<Warning>
+  The `secret` is displayed **only once** at creation time. Store it in a secrets manager or secure vault immediately — it cannot be retrieved again.
+</Warning>
+
+API keys carry **scopes** that control which endpoints they can access (for example, `trade:order` or `wallet:read`). Make sure the key you create includes every scope required for your intended use case before you begin integrating.
+
+</Step>
+
+<Step title="Sign a request with HMAC-SHA256">
+
+Every request to Poly Trader OpenAPI must include four authentication headers. The API verifies the signature server-side before processing the request.
+
+| Header | Value |
+|---|---|
+| `X-API-Key` | Your `key_id` (e.g., `pk_…`) |
+| `X-Timestamp` | Current Unix timestamp in **seconds** (integer) |
+| `X-Nonce` | A random string unique within the timestamp window |
+| `X-Signature` | HMAC-SHA256 hex digest of the canonical string (see below) |
+
+### Building the canonical string
+
+Concatenate the following fields, each separated by a newline character (`\n`), to produce the string you will sign:
+
+```
+METHOD + "\n" + PATH + "\n" + QUERY + "\n" + TIMESTAMP + "\n" + NONCE + "\n" + BODY_SHA256
+```
+
+| Field | Description |
+|---|---|
+| `METHOD` | Uppercase HTTP method, e.g. `GET` or `POST` |
+| `PATH` | The full request path, e.g. `/openapi/v1/wallet` |
+| `QUERY` | The URL query string (everything after `?`); use an empty string if there is no query |
+| `TIMESTAMP` | The same integer value you put in `X-Timestamp` |
+| `NONCE` | The same random string you put in `X-Nonce` |
+| `BODY_SHA256` | SHA-256 hex digest of the raw request body. For `GET` requests with no body, compute the SHA-256 of an empty string: `e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855` |
+
+### Signing snippet
+
+<CodeGroup>
+
+```typescript TypeScript
+import crypto from 'crypto';
+
+function sign(method: string, path: string, query: string, body: string, secret: string): {
+  timestamp: string;
+  nonce: string;
+  signature: string;
+} {
+  const timestamp = Math.floor(Date.now() / 1000).toString();
+  const nonce = crypto.randomBytes(16).toString('hex');
+  const bodyHash = crypto.createHash('sha256').update(body).digest('hex');
+  const canonical = [method.toUpperCase(), path, query, timestamp, nonce, bodyHash].join('\n');
+  const signature = crypto.createHmac('sha256', secret).update(canonical).digest('hex');
+  return { timestamp, nonce, signature };
+}
+```
+
+</CodeGroup>
+
+Pass the returned `timestamp`, `nonce`, and `signature` values directly into the `X-Timestamp`, `X-Nonce`, and `X-Signature` headers of your HTTP request, respectively.
+
+<Note>
+  Every retry of a failed request requires a **fresh timestamp, nonce, and signature**. Reusing values from a previous attempt will cause the request to be rejected.
+</Note>
+
+<Tip>
+  See the [Authentication](/concepts/authentication) page for the full specification, including timestamp drift tolerance, nonce requirements, and guidance on signing `POST` request bodies.
+</Tip>
+
+</Step>
+
+<Step title="Make your first request: GET /wallet">
+
+With your API key and a freshly generated signature, you are ready to call `GET /wallet`. This endpoint returns the custodial wallet associated with the API key, along with its current balances.
+
+### Request
+
+```bash cURL
+curl -X GET "https://test-eu.polycopy.fun/openapi/v1/wallet" \
+  -H "X-API-Key: pk_your_key_id" \
+  -H "X-Timestamp: 1717200000" \
+  -H "X-Nonce: abc123randomnonce" \
+  -H "X-Signature: <hmac_sha256_hex>"
+```
+
+Replace `pk_your_key_id` with your actual `key_id`, and replace the `X-Timestamp`, `X-Nonce`, and `X-Signature` values with those produced by your signing logic.
+
+### Expected response
+
+A successful call returns an HTTP `200` with the following envelope:
+
+```json
+{
+  "code": "OK",
+  "message": "success",
+  "data": {
+    "account_id": "9912345678901234564821",
+    "network": "polygon",
+    "wallet_address": "0xYourWalletAddress",
+    "balances": [
+      { "token": "USDC", "amount": "250.00" }
+    ]
+  },
+  "request_id": "req_202606011200000001"
+}
+```
+
+If you receive a `code` other than `OK`, check that your `X-Signature` was computed from a canonical string that exactly matches your request, and that your `X-Timestamp` reflects the current time.
+
+</Step>
+
+</Steps>

@@ -1,0 +1,115 @@
+---
+title: "GET /wallet — Wallet Balances and Account Info"
+sidebarTitle: "Get Wallet"
+description: "Retrieve your custodial wallet address, balances, and available trading capital. Supports an optional force_refresh flag for live data."
+---
+
+This endpoint returns your custodial wallet details, including your wallet address, total account value, available trading balance, and a breakdown of per-token balances. By default the response is served from a cache; set `force_refresh=true` to request a live fetch directly from the platform. You must authenticate with a key that carries the `wallet:read` scope.
+
+## Request
+
+```
+GET https://test-eu.polycopy.fun/openapi/v1/wallet
+```
+
+### Required Scope
+
+`wallet:read`
+
+### Query Parameters
+
+<ParamField query="force_refresh" type="boolean" default="false">
+  When set to `true`, the platform fetches live wallet data instead of returning the cached version. Use this when you need the most up-to-date balance immediately after a deposit or trade settlement.
+</ParamField>
+
+## Response
+
+All responses use the standard envelope: `code`, `message`, `data`, and `request_id`. The `data` object contains the fields described below.
+
+<ResponseField name="account_id" type="string">
+  Your account ID on the platform.
+</ResponseField>
+
+<ResponseField name="network" type="string">
+  The blockchain network associated with your wallet. Always `polygon` in v1.
+</ResponseField>
+
+<ResponseField name="wallet_address" type="string">
+  Your EVM custodial wallet address.
+</ResponseField>
+
+<ResponseField name="proxy_wallet" type="string | null">
+  Proxy wallet address used for certain platform operations. May be `null`.
+</ResponseField>
+
+<ResponseField name="sol_wallet" type="string | null">
+  Solana deposit address associated with your account. May be `null`.
+</ResponseField>
+
+<ResponseField name="account_value" type="string | null">
+  Total account balance, expressed as a decimal string (e.g. `"500.00"`). May be `null` if not yet computed.
+</ResponseField>
+
+<ResponseField name="available_trade" type="string | null">
+  The portion of your balance available for placing new trades, expressed as a decimal string. May be `null` if not yet computed.
+</ResponseField>
+
+<ResponseField name="deposit_addr" type="string | null">
+  The EVM address to which you should send deposits. May be `null`.
+</ResponseField>
+
+<ResponseField name="tag" type="string | null">
+  A human-readable alias for your wallet. May be `null`.
+</ResponseField>
+
+<ResponseField name="balances" type="array">
+  A list of per-token balance objects held in your wallet.
+
+  <Expandable title="Balance object fields">
+    <ResponseField name="token" type="string">
+      Token symbol (e.g. `"USDC"`).
+    </ResponseField>
+
+    <ResponseField name="token_address" type="string">
+      The EVM contract address of the token.
+    </ResponseField>
+
+    <ResponseField name="amount" type="string">
+      The balance amount for this token, expressed as a decimal string.
+    </ResponseField>
+  </Expandable>
+</ResponseField>
+
+## Example Request
+
+```bash
+curl -X GET "https://test-eu.polycopy.fun/openapi/v1/wallet" \
+  -H "X-API-Key: pk_your_key_id" \
+  -H "X-Timestamp: 1717200000" \
+  -H "X-Nonce: abc123" \
+  -H "X-Signature: <signature>"
+```
+
+## Example Response
+
+```json
+{
+  "code": "OK",
+  "message": "success",
+  "data": {
+    "account_id": "9912345678901234564821",
+    "network": "polygon",
+    "wallet_address": "0xYourWalletAddress",
+    "account_value": "500.00",
+    "available_trade": "250.00",
+    "balances": [
+      {
+        "token": "USDC",
+        "token_address": "0x3c499c542cEF5E3811e1192ce70d8cC03d5c3359",
+        "amount": "250.00"
+      }
+    ]
+  },
+  "request_id": "req_202606011200000001"
+}
+```

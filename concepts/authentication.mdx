@@ -1,0 +1,182 @@
+---
+title: "Authenticate Requests to Poly Trader OpenAPI"
+sidebarTitle: "Authentication"
+description: "Every Poly Trader OpenAPI request requires four signed headers. Learn the canonical string format, timestamp skew rules, and nonce requirements."
+---
+
+All Poly Trader OpenAPI requests are authenticated using your **API Key** combined with an **HMAC-SHA256 signature**. There is no session-based login — every HTTP request must include four signed headers that prove both your identity and the integrity of the request at the time it was made. This approach prevents replay attacks, man-in-the-middle tampering, and credential leakage.
+
+## Required headers
+
+Every request to the Poly Trader OpenAPI must include the following four HTTP headers:
+
+<ParamField header="X-API-Key" type="string" required>
+  Your API key ID, in the format `pk_...`. This identifies which key is being
+  used to sign the request.
+</ParamField>
+
+<ParamField header="X-Timestamp" type="integer" required>
+  Unix timestamp in **seconds** representing when you generated the request.
+  Must be within ±30 seconds of the server's current time.
+</ParamField>
+
+<ParamField header="X-Nonce" type="string" required>
+  A random string that must be unique within the current timestamp window.
+  Use a cryptographically random value (e.g., 16+ random bytes, hex-encoded).
+</ParamField>
+
+<ParamField header="X-Signature" type="string" required>
+  The HMAC-SHA256 hex digest of the canonical string (see below). This
+  proves that the request was signed by the holder of your API secret key.
+</ParamField>
+
+## Canonical string
+
+Before you can compute `X-Signature`, you must build the **canonical string** — a deterministic, newline-delimited representation of the request. The server reconstructs this same string independently and verifies your signature against it.
+
+The canonical string format is:
+
+```
+METHOD + "\n" + PATH + "\n" + QUERY + "\n" + TIMESTAMP + "\n" + NONCE + "\n" + BODY_SHA256
+```
+
+Each component is defined as follows:
+
+| Component | Description |
+|---|---|
+| `METHOD` | Uppercase HTTP verb: `GET`, `POST`, `PATCH`, or `DELETE`. |
+| `PATH` | The full request path including the `/openapi/v1` prefix, e.g. `/openapi/v1/wallet`. |
+| `QUERY` | The URL query string, **without** the leading `?`. Use an empty string `""` when there is no query string (the line must still be present but blank). |
+| `TIMESTAMP` | The exact same integer value you send in the `X-Timestamp` header. |
+| `NONCE` | The exact same string value you send in the `X-Nonce` header. |
+| `BODY_SHA256` | The SHA-256 hex digest of the **raw request body bytes**. For requests with no body (e.g. `GET`), compute the SHA-256 of the empty string: `e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855`. |
+
+Once you have built the canonical string, sign it with your API secret key:
+
+```
+X-Signature = HMAC-SHA256(secret_key, canonical_string).hex()
+```
+
+<Note>
+  Always use the **raw request body bytes** when computing `BODY_SHA256` — not
+  a re-serialised or pretty-printed version. Any byte-level difference between
+  your hash and the transmitted body will cause signature verification to fail.
+</Note>
+
+## Canonical string examples
+
+### GET request — no body, no query string
+
+For `GET /openapi/v1/wallet` with timestamp `1717200000` and nonce `abc123randomnonce`:
+
+```
+GET
+/openapi/v1/wallet
+
+1717200000
+abc123randomnonce
+e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+```
+
+The third line (query string) is intentionally blank because there is no query string. The `BODY_SHA256` is the well-known SHA-256 of the empty string.
+
+### POST request — JSON body, no query string
+
+For `POST /openapi/v1/orders` with body `{"asset":"abc","side":"buy","amount_usd":"10"}`, timestamp `1717200001`, and nonce `xyz789anothernonce`:
+
+```
+POST
+/openapi/v1/orders
+
+1717200001
+xyz789anothernonce
+<sha256 of body bytes>
+```
+
+Replace `<sha256 of body bytes>` with the actual SHA-256 hex digest of the UTF-8 encoded body string before signing.
+
+### GET request — with query string
+
+For `GET /openapi/v1/orders?status=open&limit=20`, the query component is `status=open&limit=20` (no leading `?`):
+
+```
+GET
+/openapi/v1/orders
+status=open&limit=20
+1717200002
+def456yetanothernonce
+e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+```
+
+## Timestamp skew
+
+The server enforces a strict clock-skew window to prevent replay attacks:
+
+- Your `X-Timestamp` must be within **±30 seconds** of the server's current Unix time.
+- If the timestamp falls outside this window — whether in the past or the future — the server rejects the request with the error code `API_KEY_TIMESTAMP_EXPIRED`.
+- Use a time-synchronised clock source (e.g., NTP) on your signing host to avoid drift. Cloud environments typically synchronise automatically; embedded or local systems may require explicit NTP configuration.
+
+## Nonce rules
+
+A nonce ("number used once") prevents an attacker who intercepts a valid request from replaying it:
+
+- Your nonce must be **unique within the same timestamp window**. Two requests with the same `X-Timestamp` value and the same `X-Nonce` value will conflict.
+- Replaying a nonce within the timestamp window is rejected with `API_KEY_NONCE_REPLAYED`.
+- Generate nonces using a **cryptographically secure random source** — for example, 16 or more random bytes encoded as a lowercase hex string (resulting in a 32+ character string).
+
+<Tip>
+  A UUID v4 (e.g., `550e8400-e29b-41d4-a716-446655440000`) is an excellent
+  nonce: it is cryptographically random, guaranteed unique in practice, and
+  human-readable in logs.
+</Tip>
+
+## Retry behaviour
+
+<Warning>
+  **Every retry must use a fresh `X-Timestamp`, `X-Nonce`, and `X-Signature`.**
+  You cannot reuse a signature from a previous attempt, even for idempotent
+  requests. The old timestamp may have expired and the old nonce is considered
+  consumed. When retrying a mutation you want to be idempotent, reuse the same
+  `Idempotency-Key` header while generating brand-new values for all four
+  signature headers.
+</Warning>
+
+See [Idempotency](/concepts/idempotency) for guidance on safely retrying state-changing requests.
+
+## API key scopes
+
+Each API key is granted one or more **scopes** that restrict which endpoints it may call. A request made with a key that lacks the required scope is rejected with `UNAUTHORIZED`.
+
+| Scope | Description |
+|---|---|
+| `trade:read` | Read orders |
+| `trade:order` | Place orders |
+| `trade:cancel` | Cancel orders |
+| `wallet:read` | Read wallet balances |
+| `positions:read` | Read positions |
+| `copytrade:read` | Read copytrade configs and records |
+| `copytrade:manage` | Create, update, and delete copytrade configs |
+| `afk:read` | Read AFK strategies and records |
+| `afk:manage` | Create and update AFK strategies |
+| `partner:users:manage` | Partner-level user provisioning |
+| `partner:api_keys:manage` | Partner-level user API key creation |
+| `*` | Full access — **partner keys only**; not permitted for user API keys |
+
+<Note>
+  `withdraw:create` is not currently supported for partner user API keys.
+  Version 1 of the API requires TOTP verification at the account level for
+  withdrawals, which cannot be delegated through a partner API key.
+</Note>
+
+## Authentication error codes
+
+If authentication fails, the server returns one of the following error codes:
+
+| Error code | Meaning |
+|---|---|
+| `UNAUTHORIZED` | The request lacks valid authentication credentials or the key does not have the required scope. |
+| `API_KEY_INVALID` | The `X-API-Key` value does not correspond to any known API key. |
+| `API_KEY_DISABLED` | The API key exists but has been disabled. |
+| `API_KEY_SIGNATURE_INVALID` | The `X-Signature` does not match the server's recomputed HMAC-SHA256 of the canonical string. |
+| `API_KEY_TIMESTAMP_EXPIRED` | The `X-Timestamp` is more than 30 seconds in the past or future. |
+| `API_KEY_NONCE_REPLAYED` | The `X-Nonce` has already been used within the current timestamp window. |

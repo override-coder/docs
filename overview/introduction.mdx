@@ -1,0 +1,81 @@
+---
+title: "Poly Trader OpenAPI: Third-Party Trading Platform"
+sidebarTitle: "Introduction"
+description: "Poly Trader OpenAPI is a REST API for external developers and partners. Learn about the base URL, response envelope, and error format."
+---
+
+Poly Trader OpenAPI is a REST API designed for external developers and partners who want to interact with the Poly Trader platform programmatically. It exposes endpoints for trading, wallet management, and account operations — all secured with HMAC-SHA256 request signatures. Whether you are building an automated trading system or integrating Poly Trader into your own product, this API gives you the programmatic access you need.
+
+## Base URL
+
+All API requests are made over HTTPS to the following base URL:
+
+```
+https://test-eu.polycopy.fun/openapi/v1
+```
+
+Append the endpoint path to this base URL for every request. For example, to call the wallet endpoint your full URL is `https://test-eu.polycopy.fun/openapi/v1/wallet`.
+
+## Response Envelope
+
+Every response from the API — whether a success or an error — is wrapped in the same JSON envelope. This consistent structure makes it straightforward to handle responses uniformly across your integration.
+
+```json
+{
+  "code": "OK",
+  "message": "success",
+  "data": { ... },
+  "request_id": "req_202606011200000001"
+}
+```
+
+<ResponseField name="code" type="string" required>
+  A string status code indicating the outcome of the request. `OK` signals success. Any other value indicates an error (e.g., `UNAUTHORIZED`, `NOT_FOUND`).
+</ResponseField>
+
+<ResponseField name="message" type="string" required>
+  A human-readable description of the outcome. On success this is typically `"success"`. On error it contains a short explanation of what went wrong.
+</ResponseField>
+
+<ResponseField name="data" type="object | null" required>
+  The response payload for the specific endpoint. On success this contains the requested resource or operation result. On error this field is always `null`.
+</ResponseField>
+
+<ResponseField name="request_id" type="string" required>
+  A unique identifier for the request, formatted as `req_` followed by a timestamp and sequence number (e.g., `req_202606011200000001`). Include this value when contacting support to help diagnose issues.
+</ResponseField>
+
+## Error Format
+
+When a request fails, the `code` field contains a non-`OK` error code and `data` is set to `null`. The `message` field provides a human-readable description to help you understand what went wrong.
+
+```json
+{
+  "code": "UNAUTHORIZED",
+  "message": "API key signature is invalid",
+  "data": null,
+  "request_id": "req_202606011200000002"
+}
+```
+
+Always check the `code` field — not just the HTTP status code — to determine whether a request succeeded, and surface the `request_id` in any error logs so it can be referenced during support escalations.
+
+## Key Constraints
+
+Before building your integration, review the following platform constraints:
+
+<Note>
+  **Custodial wallet only.** Poly Trader OpenAPI operates exclusively with custodial wallets. You do not manage private keys directly.
+</Note>
+
+<Note>
+  **HMAC-SHA256 authentication.** All API key requests must include a valid HMAC-SHA256 signature. No TOTP (two-factor authentication) is required for trading operations; however, **withdrawal requests do require TOTP**.
+</Note>
+
+<Note>
+  **Not Polymarket CLOB-compatible.** This API is not compatible with the Polymarket CLOB API. Existing Polymarket CLOB integrations cannot be pointed at this base URL without changes.
+</Note>
+
+<Note>
+  **Polygon network only (v1).** The current version of the API supports only the Polygon network. Multi-network support is not available in v1.
+</Note>

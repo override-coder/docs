@@ -1,0 +1,167 @@
+---
+title: "PATCH /afk/strategies/{strategy_id} — Update AFK Strategy"
+sidebarTitle: "Update Strategy"
+description: "Update an AFK automated trading strategy's parameters or status. All fields are optional — only the fields you send are changed."
+---
+
+Update an existing AFK strategy's parameters or status. Only the fields you include in the request body are changed; omitted fields remain unchanged. You can use this endpoint to pause a running strategy, resume a paused one, adjust risk parameters such as `buy_amount` or `stop_loss_percentage`, or toggle technical indicator filters — all in a single request. Requires the `afk:manage` scope.
+
+## Request
+
+```http
+PATCH /afk/strategies/{strategy_id}
+```
+
+**Base URL:** `https://test-eu.polycopy.fun/openapi/v1`
+
+**Required scope:** `afk:manage`
+
+<Note>
+  All requests must include the four HMAC-signed authentication headers: `X-API-Key`, `X-Timestamp`, `X-Nonce`, and `X-Signature`.
+</Note>
+
+**Optional header:** `Idempotency-Key` — supply a unique value (e.g., a UUID) to safely retry the request without applying the update more than once.
+
+## Path Parameters
+
+<ParamField path="strategy_id" type="string" required>
+  The unique identifier of the AFK strategy to update. This is the `config_id` returned by [List Strategies](/api/afk/list-strategies) or [Create Strategy](/api/afk/create-strategy).
+</ParamField>
+
+## Request Body
+
+All fields are optional. Include only the fields you want to change.
+
+<ParamField body="status" type="string">
+  Update the strategy's operational status. See the status reference table below.
+</ParamField>
+
+<ParamField body="market" type="string">
+  Market identifier or market group the strategy trades on.
+</ParamField>
+
+<ParamField body="side" type="integer">
+  Trade direction. `1` = Up (buy outcome), `2` = Down (sell outcome).
+</ParamField>
+
+<ParamField body="buy_amount" type="string">
+  Buy amount per AFK order, expressed as a decimal string.
+</ParamField>
+
+<ParamField body="tag" type="string">
+  User-visible label for the strategy.
+</ParamField>
+
+<ParamField body="period" type="integer">
+  Trading period or window for the strategy's execution cycle.
+</ParamField>
+
+<ParamField body="time_start_sec" type="integer">
+  Unix timestamp (seconds) for when the strategy's daily active window begins.
+</ParamField>
+
+<ParamField body="time_end_sec" type="integer">
+  Unix timestamp (seconds) for when the strategy's daily active window ends.
+</ParamField>
+
+<ParamField body="min_price" type="string">
+  Minimum price threshold for order execution.
+</ParamField>
+
+<ParamField body="max_price" type="string">
+  Maximum price threshold for order execution.
+</ParamField>
+
+<ParamField body="price_delta_min" type="string">
+  Minimum price delta filter.
+</ParamField>
+
+<ParamField body="price_delta_max" type="string">
+  Maximum price delta filter.
+</ParamField>
+
+<ParamField body="limit_price" type="string">
+  Limit order price. Only applies when `limit_order_copy` is `1`.
+</ParamField>
+
+<ParamField body="order_expired_ttl_seconds" type="integer">
+  Time-to-live in seconds for limit orders.
+</ParamField>
+
+<ParamField body="total_rounds" type="integer">
+  Maximum number of trading rounds before the strategy stops automatically.
+</ParamField>
+
+<ParamField body="take_profit_percentage" type="string">
+  Percentage gain that triggers an automatic take-profit exit.
+</ParamField>
+
+<ParamField body="take_profit_price" type="string">
+  Absolute price level that triggers an automatic take-profit exit.
+</ParamField>
+
+<ParamField body="stop_loss_percentage" type="string">
+  Percentage loss that triggers an automatic stop-loss exit.
+</ParamField>
+
+<ParamField body="stop_loss_price" type="string">
+  Absolute price level that triggers an automatic stop-loss exit.
+</ParamField>
+
+<ParamField body="limit_order_copy" type="integer">
+  Order type switch. `0` = market order, `1` = limit order.
+</ParamField>
+
+<ParamField body="slippage" type="string">
+  Accepted slippage percentage for market orders (e.g., `"2"` = 2%).
+</ParamField>
+
+<ParamField body="use_kdj" type="integer">
+  KDJ indicator switch. `0` = off, `1` = on.
+</ParamField>
+
+<ParamField body="use_macd" type="integer">
+  MACD indicator switch. `0` = off, `1` = on.
+</ParamField>
+
+<ParamField body="use_atr" type="integer">
+  ATR indicator switch. `0` = off, `1` = on.
+</ParamField>
+
+## Status Reference
+
+| Status | Description |
+|--------|-------------|
+| `running` | The strategy is actively monitoring the market and executing trades. |
+| `paused` | The strategy is paused; no new trades will be executed until resumed. |
+| `disabled` | The strategy is permanently stopped and cannot be restarted without re-creation. |
+
+<Warning>
+  Setting `status` to `disabled` is irreversible. You will need to create a new strategy if you want to resume automated trading with the same parameters.
+</Warning>
+
+## Example Requests
+
+**Pause a running strategy:**
+
+```bash
+curl -X PATCH "https://test-eu.polycopy.fun/openapi/v1/afk/strategies/42" \
+  -H "X-API-Key: pk_your_key_id" \
+  -H "X-Timestamp: 1717200000" \
+  -H "X-Nonce: abc123" \
+  -H "X-Signature: <signature>" \
+  -H "Content-Type: application/json" \
+  -d '{"status": "paused"}'
+```
+
+**Resume a paused strategy and increase the buy amount:**
+
+```bash
+curl -X PATCH "https://test-eu.polycopy.fun/openapi/v1/afk/strategies/42" \
+  -H "X-API-Key: pk_your_key_id" \
+  -H "X-Timestamp: 1717200001" \
+  -H "X-Nonce: fresh_nonce_here" \
+  -H "X-Signature: <new_signature>" \
+  -H "Content-Type: application/json" \
+  -d '{"status": "running", "buy_amount": "15"}'
+```

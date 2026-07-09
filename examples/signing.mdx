@@ -1,0 +1,257 @@
+---
+title: "Request Signing Examples: TypeScript, Python, cURL"
+sidebarTitle: "Signing Examples"
+description: "Copy-paste HMAC-SHA256 signing implementations for Poly Trader OpenAPI in TypeScript, Python, and cURL with a complete working example."
+---
+
+Every authenticated request to the Poly Trader OpenAPI requires you to build a canonical string from the request's method, path, query, timestamp, nonce, and body hash — then sign it with your secret using HMAC-SHA256 to produce the `X-Signature` header. The examples below show you exactly how to do that in TypeScript/Node.js, Python, and cURL (bash). All three examples target the same `GET /wallet` endpoint so you can compare them side-by-side.
+
+## TypeScript / Node.js
+
+The snippet below gives you a standalone `sign()` utility and a thin `apiRequest()` wrapper that attaches all four required headers (`X-API-Key`, `X-Timestamp`, `X-Nonce`, `X-Signature`) before calling the API with the native `fetch`.
+
+```typescript
+import crypto from 'crypto';
+
+const BASE_URL = 'https://test-eu.polycopy.fun/openapi/v1';
+
+/**
+ * Build the canonical string and return the three signing artefacts.
+ * The canonical string is:
+ *   METHOD\nPATH\nQUERY\nTIMESTAMP\nNONCE\nBODY_HASH
+ */
+function sign(
+  method: string,
+  path: string,
+  query: string,
+  body: string,
+  secret: string
+): { timestamp: string; nonce: string; signature: string } {
+  const timestamp = Math.floor(Date.now() / 1000).toString();
+  const nonce = crypto.randomBytes(16).toString('hex');
+  const bodyHash = crypto.createHash('sha256').update(body, 'utf8').digest('hex');
+  const canonical = [method.toUpperCase(), path, query, timestamp, nonce, bodyHash].join('\n');
+  const signature = crypto
+    .createHmac('sha256', secret)
+    .update(canonical, 'utf8')
+    .digest('hex');
+  return { timestamp, nonce, signature };
+}
+
+/**
+ * Make an authenticated request to the Poly Trader OpenAPI.
+ *
+ * @param keyId    Your API key ID  (X-API-Key header)
+ * @param secret   Your API secret  (used to sign the request)
+ * @param method   HTTP method, e.g. "GET" or "POST"
+ * @param endpoint Path relative to /openapi/v1, e.g. "/wallet"
+ * @param params   Optional query-string parameters
+ * @param body     Optional JSON request body
+ */
+async function apiRequest(
+  keyId: string,
+  secret: string,
+  method: string,
+  endpoint: string,
+  params?: Record<string, string>,
+  body?: object
+): Promise<unknown> {
+  const query = params ? new URLSearchParams(params).toString() : '';
+  const bodyStr = body ? JSON.stringify(body) : '';
+  const url = `${BASE_URL}${endpoint}${query ? '?' + query : ''}`;
+
+  const { timestamp, nonce, signature } = sign(
+    method,
+    `/openapi/v1${endpoint}`,
+    query,
+    bodyStr,
+    secret
+  );
+
+  const headers: Record<string, string> = {
+    'X-API-Key': keyId,
+    'X-Timestamp': timestamp,
+    'X-Nonce': nonce,
+    'X-Signature': signature,
+  };
+  if (bodyStr) headers['Content-Type'] = 'application/json';
+
+  const res = await fetch(url, { method, headers, body: bodyStr || undefined });
+  return res.json();
+}
+
+// ── Example: fetch your wallet ──────────────────────────────────────────────
+const KEY_ID = 'pk_your_key_id';
+const SECRET = 'sk_your_secret';
+
+apiRequest(KEY_ID, SECRET, 'GET', '/wallet').then(console.log);
+```
+
+<Note>
+  The `path` argument passed to `sign()` must be the **full path** including the
+  `/openapi/v1` prefix — for example `/openapi/v1/wallet` — even though
+  `endpoint` is the short form `/wallet`. The server uses the full path when
+  it verifies your signature.
+</Note>
+
+## Python
+
+The Python version uses only standard-library modules (`hashlib`, `hmac`, `secrets`, `json`, `urllib.parse`) plus the popular `requests` package for the HTTP call. The signing logic is identical to the TypeScript version above.
+
+```python
+import hashlib
+import hmac
+import time
+import secrets
+import json
+from urllib.parse import urlencode
+import requests
+
+BASE_URL = 'https://test-eu.polycopy.fun/openapi/v1'
+
+
+def sign(
+    method: str,
+    path: str,
+    query: str,
+    body: str,
+    secret: str,
+) -> tuple[str, str, str]:
+    """Return (timestamp, nonce, signature) for the given request parameters."""
+    timestamp = str(int(time.time()))
+    nonce = secrets.token_hex(16)
+    body_hash = hashlib.sha256(body.encode('utf-8')).hexdigest()
+    canonical = '\n'.join([method.upper(), path, query, timestamp, nonce, body_hash])
+    signature = hmac.new(
+        secret.encode('utf-8'),
+        canonical.encode('utf-8'),
+        hashlib.sha256,
+    ).hexdigest()
+    return timestamp, nonce, signature
+
+
+def api_request(
+    key_id: str,
+    secret: str,
+    method: str,
+    endpoint: str,
+    params: dict | None = None,
+    body: dict | None = None,
+):
+    """Make an authenticated request to the Poly Trader OpenAPI."""
+    query = urlencode(params) if params else ''
+    body_str = json.dumps(body, separators=(',', ':')) if body else ''
+    url = f'{BASE_URL}{endpoint}' + (f'?{query}' if query else '')
+
+    timestamp, nonce, signature = sign(
+        method, f'/openapi/v1{endpoint}', query, body_str, secret
+    )
+
+    headers = {
+        'X-API-Key': key_id,
+        'X-Timestamp': timestamp,
+        'X-Nonce': nonce,
+        'X-Signature': signature,
+    }
+    if body_str:
+        headers['Content-Type'] = 'application/json'
+
+    response = requests.request(
+        method,
+        url,
+        headers=headers,
+        data=body_str.encode('utf-8') if body_str else None,
+    )
+    return response.json()
+
+
+# ── Example: fetch your wallet ──────────────────────────────────────────────
+KEY_ID = 'pk_your_key_id'
+SECRET = 'sk_your_secret'
+
+result = api_request(KEY_ID, SECRET, 'GET', '/wallet')
+print(result)
+```
+
+<Note>
+  Python's `hmac` module is called as `hmac.new(key, msg, digestmod)` — not
+  `hmac.HMAC(...)` directly. Pass `hashlib.sha256` as the `digestmod` argument
+  and call `.hexdigest()` on the result to get the lowercase hex signature
+  string the server expects.
+</Note>
+
+## cURL (Bash)
+
+Because cURL itself has no built-in HMAC support, you need a small shell script to pre-compute the signature with `openssl` before passing the headers to `curl`. The script below is self-contained — the only dependencies are `openssl` and `curl`, which ship with every major Linux distribution and macOS.
+
+```bash
+#!/usr/bin/env bash
+# Requires: openssl, curl
+# Usage: bash sign_request.sh
+
+KEY_ID="pk_your_key_id"
+SECRET="sk_your_secret"
+METHOD="GET"
+PATH="/openapi/v1/wallet"
+QUERY=""
+BODY=""
+
+# 1. Generate timestamp and nonce
+TIMESTAMP=$(date +%s)
+NONCE=$(openssl rand -hex 16)
+
+# 2. Hash the request body (empty string for GET requests)
+BODY_HASH=$(printf '%s' "$BODY" | openssl dgst -sha256 | awk '{print $2}')
+
+# 3. Build the canonical string with literal newlines using printf
+CANONICAL=$(printf '%s\n%s\n%s\n%s\n%s\n%s' \
+  "$METHOD" "$PATH" "$QUERY" "$TIMESTAMP" "$NONCE" "$BODY_HASH")
+
+# 4. Sign the canonical string
+SIGNATURE=$(printf '%s' "$CANONICAL" | openssl dgst -sha256 -hmac "$SECRET" | awk '{print $2}')
+
+# 5. Send the request
+curl -s -X GET "https://test-eu.polycopy.fun/openapi/v1/wallet" \
+  -H "X-API-Key: ${KEY_ID}"      \
+  -H "X-Timestamp: ${TIMESTAMP}" \
+  -H "X-Nonce: ${NONCE}"         \
+  -H "X-Signature: ${SIGNATURE}"
+```
+
+<Warning>
+  You must build the canonical string with **literal newline characters**, not
+  the two-character escape sequence `\n`. The `printf '%s\n%s\n...'` form used
+  in step 3 above produces real newlines. If you use `echo` or string
+  concatenation with `\n` as text, the signature will not match and the server
+  will return `API_KEY_SIGNATURE_INVALID`.
+</Warning>
+
+<Note>
+  For `GET` requests with no body, `BODY` is an empty string and `BODY_HASH`
+  must be the SHA-256 hash of the empty string:
+  `e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855`.
+  The script above handles this automatically because `printf '%s' ""` produces
+  no output, and `openssl dgst -sha256` of empty input returns that exact hash.
+</Note>
+
+## POST example with body
+
+The same `apiRequest()` helper handles `POST` requests. Pass your JSON body as the last argument and it will be serialised, hashed, and signed automatically. Here is an example that places a buy order:
+
+```typescript
+// Place a buy order for $10 of a prediction-market asset
+const order = await apiRequest(KEY_ID, SECRET, 'POST', '/orders', undefined, {
+  asset: '0xasset_address_here',
+  side: 'buy',
+  amount_usd: '10',
+});
+console.log(order);
+```
+
+<Tip>
+  For `POST` requests make sure you serialise the body with
+  `JSON.stringify(body)` (TypeScript) or
+  `json.dumps(body, separators=(',', ':'))` (Python) **before** hashing it, and
+  that you send the **exact same bytes** in the HTTP body. Any difference —
+  extra whitespace, key ordering, encoding — will invalidate the signature.
+</Tip>

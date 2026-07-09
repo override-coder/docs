@@ -1,0 +1,221 @@
+---
+title: "POST /copytrade/configs — Create a Copytrade Configuration"
+sidebarTitle: "Create Config"
+description: "Create a new copytrade configuration to follow a trader's wallet. Configure copy percentage, price limits, keywords, and market type filters."
+---
+
+Use this endpoint to create a new copytrade configuration that automatically copies trades from a target trader wallet address. You can tune copy behavior with percentage or fixed-amount sizing, price range filters, slippage tolerance, keyword filters, and directional controls. Requires the `copytrade:manage` scope. You may optionally supply an `Idempotency-Key` header to safely retry the request without creating duplicate configurations.
+
+## Request
+
+```
+POST /copytrade/configs
+```
+
+### Required Scope
+
+`copytrade:manage`
+
+### Optional Header
+
+| Header | Description |
+|---|---|
+| `Idempotency-Key` | A unique key (e.g. a UUID) you generate. Repeated requests with the same key return the original response without creating a duplicate configuration. |
+
+### Request Body
+
+<ParamField body="target_address" type="string" required>
+  The trader wallet address to follow. This is the on-chain address whose trades will be copied.
+</ParamField>
+
+<ParamField body="tag" type="string">
+  A human-readable label to help you identify this configuration.
+</ParamField>
+
+<ParamField body="copy_percentage" type="string">
+  Percentage of the trader's order size to copy, expressed as a string number (e.g. `"100"` to copy at full size, `"50"` to copy at half size). Mutually exclusive with `copy_fixed_amount`.
+</ParamField>
+
+<ParamField body="copy_fixed_amount" type="string">
+  Fixed token amount to use per copied trade, regardless of the trader's order size. Mutually exclusive with `copy_percentage`.
+</ParamField>
+
+<ParamField body="max_token_spend" type="string">
+  Maximum token amount that can be spent on any single copied trade.
+</ParamField>
+
+<ParamField body="total_token_spend" type="string">
+  Cumulative token spend cap across all copied trades for this configuration.
+</ParamField>
+
+<ParamField body="min_copy_amount_per_trade" type="string">
+  Minimum token amount to copy per trade. Trades that would result in a smaller copy amount are skipped.
+</ParamField>
+
+<ParamField body="max_copy_amount_per_trade" type="string">
+  Maximum token amount to copy per trade. Copy amounts exceeding this value are capped.
+</ParamField>
+
+<ParamField body="min_price" type="string">
+  Minimum token price filter (e.g. `"0.01"`). Trades where the token price is below this value are skipped.
+</ParamField>
+
+<ParamField body="max_price" type="string">
+  Maximum token price filter (e.g. `"0.99"`). Trades where the token price is above this value are skipped.
+</ParamField>
+
+<ParamField body="slippage" type="string">
+  Buy-side market order slippage tolerance, expressed as a percentage string (e.g. `"2"` for 2%).
+</ParamField>
+
+<ParamField body="copy_buy" type="boolean">
+  When `true`, buy trades from the target wallet are copied. Defaults to `true`.
+</ParamField>
+
+<ParamField body="copy_sell" type="boolean">
+  When `true`, sell trades from the target wallet are copied. Defaults to `true`.
+</ParamField>
+
+<ParamField body="limit_order_copy" type="boolean">
+  When `true`, buy limit orders placed by the target wallet are also copied.
+</ParamField>
+
+<ParamField body="sell_limit_order_copy" type="boolean">
+  When `true`, sell limit orders placed by the target wallet are also copied.
+</ParamField>
+
+<ParamField body="reverse_copy" type="boolean">
+  When `true`, the copied trade direction is inverted — target buys become your sells and vice versa.
+</ParamField>
+
+<ParamField body="keyword_whitelist" type="string[]">
+  List of keyword strings to whitelist at creation time. Only markets whose names match at least one keyword are eligible to be copied.
+</ParamField>
+
+<ParamField body="keyword_blacklist" type="string[]">
+  List of keyword strings to blacklist at creation time. Markets whose names match any keyword in this list are skipped.
+</ParamField>
+
+<ParamField body="status" type="string">
+  Initial status for the configuration. One of `running`, `paused`, or `disabled`. Defaults to `running`.
+</ParamField>
+
+<Note>
+  `keyword_whitelist` and `keyword_blacklist` are accepted only at creation time. To add or remove keywords after a configuration has been created, use `POST /copytrade/configs/{config_id}/keywords` and `DELETE /copytrade/configs/{config_id}/keywords/{key_word_id}`.
+</Note>
+
+## Response
+
+The response `data` field contains the full `CopytradeConfig` object representing the newly created configuration.
+
+<ResponseField name="data" type="object">
+  <Expandable title="CopytradeConfig fields">
+    <ResponseField name="config_id" type="string">
+      Unique identifier assigned to the new configuration.
+    </ResponseField>
+
+    <ResponseField name="target_address" type="string">
+      The trader wallet address being followed.
+    </ResponseField>
+
+    <ResponseField name="tag" type="string">
+      Label for this configuration.
+    </ResponseField>
+
+    <ResponseField name="status" type="string">
+      Current status: `running`, `paused`, or `disabled`.
+    </ResponseField>
+
+    <ResponseField name="copy_percentage" type="string">
+      Percentage of the trader's order size to copy.
+    </ResponseField>
+
+    <ResponseField name="copy_buy" type="boolean">
+      Whether buy trades are being copied.
+    </ResponseField>
+
+    <ResponseField name="copy_sell" type="boolean">
+      Whether sell trades are being copied.
+    </ResponseField>
+
+    <ResponseField name="reverse_copy" type="boolean">
+      Whether trade direction is inverted.
+    </ResponseField>
+
+    <ResponseField name="min_price" type="string">
+      Minimum price filter in effect.
+    </ResponseField>
+
+    <ResponseField name="max_price" type="string">
+      Maximum price filter in effect.
+    </ResponseField>
+
+    <ResponseField name="slippage" type="string">
+      Buy-side slippage tolerance in effect.
+    </ResponseField>
+
+    <ResponseField name="created_at" type="string">
+      ISO 8601 timestamp of when the configuration was created.
+    </ResponseField>
+
+    <ResponseField name="updated_at" type="string">
+      ISO 8601 timestamp of when the configuration was last updated.
+    </ResponseField>
+  </Expandable>
+</ResponseField>
+
+## Example Request
+
+```bash
+curl -X POST "https://test-eu.polycopy.fun/openapi/v1/copytrade/configs" \
+  -H "X-API-Key: pk_your_key_id" \
+  -H "X-Timestamp: 1717200000" \
+  -H "X-Nonce: abc123" \
+  -H "X-Signature: <signature>" \
+  -H "Idempotency-Key: config-uuid-here" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "target_address": "0xTraderWalletAddress",
+    "tag": "leader A",
+    "copy_percentage": "100",
+    "max_token_spend": "1000",
+    "total_token_spend": "5000",
+    "min_copy_amount_per_trade": "1",
+    "max_copy_amount_per_trade": "100",
+    "min_price": "0.01",
+    "max_price": "0.99",
+    "slippage": "2",
+    "copy_buy": true,
+    "copy_sell": true
+  }'
+```
+
+## Example Response
+
+```json
+{
+  "code": "OK",
+  "message": "success",
+  "data": {
+    "config_id": "124",
+    "target_address": "0xTraderWalletAddress",
+    "tag": "leader A",
+    "status": "running",
+    "copy_percentage": "100",
+    "copy_fixed_amount": null,
+    "max_token_spend": "1000",
+    "total_token_spend": "5000",
+    "min_copy_amount_per_trade": "1",
+    "max_copy_amount_per_trade": "100",
+    "min_price": "0.01",
+    "max_price": "0.99",
+    "slippage": "2",
+    "copy_buy": true,
+    "copy_sell": true,
+    "reverse_copy": false,
+    "created_at": "2024-06-01T12:00:00Z",
+    "updated_at": "2024-06-01T12:00:00Z"
+  },
+  "request_id": "req_202606011200000002"
+}
+```
