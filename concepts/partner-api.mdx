@@ -15,6 +15,7 @@ Use a partner API key with the required scope:
 | `GET /partner/users` | `partner:users:manage` or `*` |
 | `POST /partner/users` | `partner:users:manage` or `*` |
 | `POST /partner/users/{user_account_id}/api-keys` | `partner:api_keys:manage` or `*` |
+| `DELETE /partner/users/{user_account_id}/api-keys/{key_id}` | `partner:api_keys:manage` or `*` |
 
 Partner API keys are issued by PolyCop. Use them to create or get partner users, list those users, and create user API keys for a selected `user_account_id`.
 
@@ -80,3 +81,13 @@ The response includes the user API key. The `secret` is shown only once.
 If `scopes` is omitted, PolyCop grants the default user scopes: `trade:read`, `trade:order`, `trade:cancel`, `wallet:read`, `positions:read`, `copytrade:read`, `copytrade:manage`, `afk:read`, and `afk:manage`.
 
 User API keys cannot use the wildcard `*` scope. `withdraw:create` is not supported for partner user API keys in v1 because withdrawals require account-level TOTP.
+
+## Revoke a user API key
+
+Call `DELETE /partner/users/{user_account_id}/api-keys/{key_id}` to revoke a user API key created by your partner account.
+
+```bash
+DELETE /partner/users/9912345678901234564822/api-keys/pk_xxx
+```
+
+Partners can only revoke user API keys created by their own partner account. This endpoint cannot revoke keys created by another partner or direct user API keys.

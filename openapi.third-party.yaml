@@ -957,6 +957,52 @@ paths:
           "$ref": "#/components/responses/NotFound"
         '409':
           "$ref": "#/components/responses/Conflict"
+  "/partner/users/{user_account_id}/api-keys/{key_id}":
+    delete:
+      tags:
+      - Partner
+      summary: Revoke a user API key for a partner user
+      operationId: revokePartnerUserApiKey
+      description: Requires a partner API key with `partner:api_keys:manage` or `*` scope. Only revokes user API keys created by the authenticated partner for the specified `user_account_id`; it cannot revoke another partner's keys or direct user keys.
+      parameters:
+      - name: user_account_id
+        in: path
+        required: true
+        schema:
+          "$ref": "#/components/schemas/AccountId"
+      - "$ref": "#/components/parameters/KeyId"
+      security:
+      - ApiKeyAuth: []
+        ApiTimestamp: []
+        ApiNonce: []
+        ApiSignature: []
+      responses:
+        '200':
+          description: User API key revoked
+          content:
+            application/json:
+              schema:
+                allOf:
+                - "$ref": "#/components/schemas/ApiResponse"
+                - type: object
+                  properties:
+                    data:
+                      type: object
+                      required:
+                      - status
+                      properties:
+                        status:
+                          type: string
+                          enum:
+                          - revoked
+        '400':
+          "$ref": "#/components/responses/BadRequest"
+        '401':
+          "$ref": "#/components/responses/Unauthorized"
+        '403':
+          "$ref": "#/components/responses/Forbidden"
+        '404':
+          "$ref": "#/components/responses/NotFound"
 components:
   securitySchemes:
     ApiKeyAuth:
@@ -1006,6 +1052,13 @@ components:
       schema:
         type: string
         maxLength: 128
+    KeyId:
+      name: key_id
+      in: path
+      required: true
+      schema:
+        type: string
+        example: pk_abc
     WithdrawId:
       name: withdraw_id
       in: path
