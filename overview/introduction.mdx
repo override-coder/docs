@@ -1,10 +1,12 @@
 ---
-title: "Poly Trader OpenAPI: Introduction and Platform Overview"
+title: "Poly Trader OpenAPI: Introduction"
 sidebarTitle: "Introduction"
-description: "Poly Trader OpenAPI is a REST API for external developers and partners. Learn about the base URL, response envelope, and error format."
+description: "Poly Trader OpenAPI is a third-party API for external developers and partners using API Key + HMAC-SHA256 authentication."
 ---
 
-Poly Trader OpenAPI is a REST API designed for external developers and partners who want to interact with the Poly Trader platform programmatically. It exposes endpoints for trading, wallet management, and account operations — all secured with HMAC-SHA256 request signatures. Whether you are building an automated trading system or integrating Poly Trader into your own product, this API gives you the programmatic access you need.
+Poly Trader OpenAPI is a REST API for external developers and partners who need programmatic access to Poly Trader workflows. This documentation covers only third-party endpoints authenticated with **API Key + HMAC-SHA256** signatures.
+
+The API exposes partner provisioning, wallet, order, position, copytrade, and AFK strategy endpoints. It does not document first-party Web APIs, Bearer-token login APIs, account management APIs, or security setup APIs.
 
 ## Base URL
 
@@ -14,7 +16,7 @@ All API requests are made over HTTPS to the following base URL:
 https://test-eu.polycopy.fun/openapi/v1
 ```
 
-Append the endpoint path to this base URL for every request. For example, to call the wallet endpoint your full URL is `https://test-eu.polycopy.fun/openapi/v1/wallet`.
+Append the endpoint path to this base URL for every request. For example, to call the wallet endpoint, use `https://test-eu.polycopy.fun/openapi/v1/wallet`.
 
 ## Response Envelope
 
@@ -69,7 +71,7 @@ Before building your integration, review the following platform constraints:
 </Note>
 
 <Note>
-  **HMAC-SHA256 authentication.** All API key requests must include a valid HMAC-SHA256 signature. No TOTP (two-factor authentication) is required for trading operations; however, **withdrawal requests do require TOTP**.
+  **HMAC-SHA256 authentication.** Every API request must include `X-API-Key`, `X-Timestamp`, `X-Nonce`, and `X-Signature`. Trading operations do not require TOTP. Withdrawal requests require TOTP.
 </Note>
 
 <Note>

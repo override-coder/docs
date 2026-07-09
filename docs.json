@@ -8,6 +8,12 @@
     "dark": "#4fa1ab"
   },
   "favicon": "/favicon.svg",
+  "api": {
+    "openapi": "openapi.third-party.yaml",
+    "playground": {
+      "display": "interactive"
+    }
+  },
   "navigation": {
     "tabs": [
       {
@@ -43,62 +49,7 @@
       },
       {
         "tab": "API Reference",
-        "groups": [
-          {
-            "group": "Partner",
-            "pages": [
-              "api/partner/list-users",
-              "api/partner/create-user",
-              "api/partner/create-user-api-key"
-            ]
-          },
-          {
-            "group": "Wallet",
-            "pages": [
-              "api/wallet/get-wallet",
-              "api/wallet/create-withdrawal",
-              "api/wallet/get-withdrawal"
-            ]
-          },
-          {
-            "group": "Orders",
-            "pages": [
-              "api/orders/place-order",
-              "api/orders/list-orders",
-              "api/orders/get-order",
-              "api/orders/cancel-order"
-            ]
-          },
-          {
-            "group": "Positions",
-            "pages": [
-              "api/positions/list-positions"
-            ]
-          },
-          {
-            "group": "Copytrade",
-            "pages": [
-              "api/copytrade/list-configs",
-              "api/copytrade/create-config",
-              "api/copytrade/get-config",
-              "api/copytrade/update-config",
-              "api/copytrade/delete-config",
-              "api/copytrade/keywords",
-              "api/copytrade/market-types",
-              "api/copytrade/list-records"
-            ]
-          },
-          {
-            "group": "AFK",
-            "pages": [
-              "api/afk/list-strategies",
-              "api/afk/create-strategy",
-              "api/afk/get-strategy",
-              "api/afk/update-strategy",
-              "api/afk/list-records"
-            ]
-          }
-        ]
+        "openapi": "openapi.third-party.yaml"
       }
     ]
   },

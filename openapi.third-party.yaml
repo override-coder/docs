@@ -1,0 +1,2819 @@
+openapi: 3.0.3
+info:
+  title: Poly Trader OpenAPI
+  version: 0.1.0
+  license:
+    name: Proprietary
+  description: |
+    Public third-party API for the openapi gateway service.
+
+    This document only exposes API Key authenticated endpoints. All requests use HMAC-SHA256 signatures with `X-API-Key`, `X-Timestamp`, `X-Nonce`, and `X-Signature`.
+
+    Core constraints:
+    - Custodial wallet only.
+    - API key requests use HMAC-SHA256 signatures.
+    - API key trading does not require TOTP.
+    - Withdraw requires TOTP and only supports Polygon in v1.
+    - `openapi_account_id` is public; `master_telegram_id` is internal.
+    - This is not a Polymarket CLOB-compatible API.
+servers:
+- url: https://test-eu.polycopy.fun/openapi/v1
+  description: Verified test environment
+x-doc-classification:
+  level_1:
+  - Third-party API
+  level_2:
+    Third-party API:
+      programmatic_trading: API key plus HMAC
+  level_3:
+    Third-party API:
+    - partner
+    - wallet
+    - orders
+    - positions
+    - copytrade
+    - afk
+    - withdraw
+tags:
+- name: Partner
+  description: Partner account user provisioning and delegated user API key creation.
+- name: Wallet
+  description: Custodial wallet balance and Polygon withdrawal APIs.
+- name: Orders
+  description: Programmatic order placement, listing, lookup, and cancellation.
+- name: Positions
+  description: Account position query APIs.
+- name: Copytrade
+  description: Copytrade configuration, market filters, keywords, and execution records.
+- name: AFK
+  description: AFK strategy configuration and execution records.
+paths:
+  "/partner/users":
+    get:
+      tags:
+      - Partner
+      summary: List partner users
+      operationId: listPartnerUsers
+      description: Requires a partner API key with `partner:users:manage` or `*` scope.
+        Results are ordered by newest partner user first. Use the returned `next_cursor`
+        as the next request's `cursor`.
+      security:
+      - ApiKeyAuth: []
+        ApiTimestamp: []
+        ApiNonce: []
+        ApiSignature: []
+      parameters:
+      - "$ref": "#/components/parameters/Limit"
+      - "$ref": "#/components/parameters/Cursor"
+      responses:
+        '200':
+          description: Partner user list
+          content:
+            application/json:
+              schema:
+                allOf:
+                - "$ref": "#/components/schemas/ApiResponse"
+                - type: object
+                  properties:
+                    data:
+                      "$ref": "#/components/schemas/PartnerUserListData"
+        '400':
+          "$ref": "#/components/responses/BadRequest"
+        '401':
+          "$ref": "#/components/responses/Unauthorized"
+        '403':
+          "$ref": "#/components/responses/Forbidden"
+    post:
+      tags:
+      - Partner
+      summary: Create or get a partner user
+      operationId: createPartnerUser
+      description: Requires a partner API key with `partner:users:manage` or `*` scope.
+      security:
+      - ApiKeyAuth: []
+        ApiTimestamp: []
+        ApiNonce: []
+        ApiSignature: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              "$ref": "#/components/schemas/PartnerUserCreateRequest"
+      responses:
+        '200':
+          description: Partner user created or returned
+          content:
+            application/json:
+              schema:
+                allOf:
+                - "$ref": "#/components/schemas/ApiResponse"
+                - type: object
+                  properties:
+                    data:
+                      "$ref": "#/components/schemas/PartnerUserData"
+        '400':
+          "$ref": "#/components/responses/BadRequest"
+        '401':
+          "$ref": "#/components/responses/Unauthorized"
+        '403':
+          "$ref": "#/components/responses/Forbidden"
+        '404':
+          "$ref": "#/components/responses/NotFound"
+  "/partner/users/{user_account_id}/api-keys":
+    post:
+      tags:
+      - Partner
+      summary: Create a user API key for a partner user
+      operationId: createPartnerUserApiKey
+      description: Requires a partner API key with `partner:api_keys:manage` or `*`
+        scope. The partner user must have `wallet_status=ready`; if it is `pending`
+        or `failed`, retry create-or-get for the same `external_user_id` before creating
+        the user API key. The returned secret is shown only once.
+      security:
+      - ApiKeyAuth: []
+        ApiTimestamp: []
+        ApiNonce: []
+        ApiSignature: []
+      parameters:
+      - name: user_account_id
+        in: path
+        required: true
+        schema:
+          "$ref": "#/components/schemas/AccountId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              "$ref": "#/components/schemas/PartnerUserApiKeyCreateRequest"
+      responses:
+        '200':
+          description: User API key created
+          content:
+            application/json:
+              schema:
+                allOf:
+                - "$ref": "#/components/schemas/ApiResponse"
+                - type: object
+                  properties:
+                    data:
+                      "$ref": "#/components/schemas/CreateApiKeyData"
+        '400':
+          "$ref": "#/components/responses/BadRequest"
+        '401':
+          "$ref": "#/components/responses/Unauthorized"
+        '403':
+          "$ref": "#/components/responses/Forbidden"
+        '404':
+          "$ref": "#/components/responses/NotFound"
+        '409':
+          "$ref": "#/components/responses/Conflict"
+  "/wallet":
+    get:
+      tags:
+      - Wallet
+      summary: Get wallet and balances
+      operationId: getWallet
+      security:
+      - ApiKeyAuth: []
+        ApiTimestamp: []
+        ApiNonce: []
+        ApiSignature: []
+      parameters:
+      - "$ref": "#/components/parameters/ForceRefresh"
+      responses:
+        '200':
+          description: Wallet
+          content:
+            application/json:
+              schema:
+                allOf:
+                - "$ref": "#/components/schemas/ApiResponse"
+                - type: object
+                  properties:
+                    data:
+                      "$ref": "#/components/schemas/Wallet"
+        '401':
+          "$ref": "#/components/responses/Unauthorized"
+  "/wallet/withdraw":
+    post:
+      tags:
+      - Wallet
+      summary: Create a Polygon withdrawal
+      operationId: createWithdrawal
+      parameters:
+      - "$ref": "#/components/parameters/RequiredIdempotencyKey"
+      description: |
+        API key signed request. Withdraw requires TOTP, Idempotency-Key, and only supports Polygon in v1.
+        `Idempotency-Key` is mandatory for this endpoint. It identifies one business withdrawal request.
+        Client retries after timeout or network failure must reuse the same `Idempotency-Key` and
+        exactly the same JSON body; each retry still needs a fresh `X-Timestamp`, `X-Nonce`, and
+        `X-Signature`. Reusing the same key with a different body is rejected with `CONFLICT`.
+
+        Rate limit: each account may call this endpoint up to 5 times per minute.
+        Concurrency rule: each account may have only one unfinished withdrawal. Statuses
+        `processing`, `submitting`, and `submitted` are unfinished; a new withdrawal can be
+        created only after the previous withdrawal becomes `succeeded` or `failed`.
+      security:
+      - ApiKeyAuth: []
+        ApiTimestamp: []
+        ApiNonce: []
+        ApiSignature: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              "$ref": "#/components/schemas/CreateWithdrawalRequest"
+      responses:
+        '200':
+          description: Withdrawal created
+          content:
+            application/json:
+              schema:
+                allOf:
+                - "$ref": "#/components/schemas/ApiResponse"
+                - type: object
+                  properties:
+                    data:
+                      "$ref": "#/components/schemas/WithdrawalCreated"
+        '403':
+          "$ref": "#/components/responses/Forbidden"
+        '409':
+          "$ref": "#/components/responses/Conflict"
+        '422':
+          "$ref": "#/components/responses/ValidationFailed"
+        '429':
+          "$ref": "#/components/responses/RateLimited"
+  "/wallet/withdrawals/{withdraw_id}":
+    get:
+      tags:
+      - Wallet
+      summary: Get withdrawal status
+      operationId: getWithdrawal
+      security:
+      - ApiKeyAuth: []
+        ApiTimestamp: []
+        ApiNonce: []
+        ApiSignature: []
+      parameters:
+      - "$ref": "#/components/parameters/WithdrawId"
+      responses:
+        '200':
+          description: Withdrawal status
+          content:
+            application/json:
+              schema:
+                allOf:
+                - "$ref": "#/components/schemas/ApiResponse"
+                - type: object
+                  properties:
+                    data:
+                      "$ref": "#/components/schemas/Withdrawal"
+        '404':
+          "$ref": "#/components/responses/NotFound"
+  "/orders":
+    post:
+      tags:
+      - Orders
+      summary: Place an order
+      operationId: placeOrder
+      parameters:
+      - "$ref": "#/components/parameters/IdempotencyKey"
+      security:
+      - ApiKeyAuth: []
+        ApiTimestamp: []
+        ApiNonce: []
+        ApiSignature: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              "$ref": "#/components/schemas/PlaceOrderRequest"
+      responses:
+        '200':
+          description: Order accepted
+          content:
+            application/json:
+              schema:
+                allOf:
+                - "$ref": "#/components/schemas/ApiResponse"
+                - type: object
+                  properties:
+                    data:
+                      "$ref": "#/components/schemas/OrderResult"
+        '422':
+          "$ref": "#/components/responses/ValidationFailed"
+    get:
+      tags:
+      - Orders
+      summary: List account orders
+      description: Returns an empty `items` array when the account has no matching
+        orders.
+      operationId: listOrders
+      security:
+      - ApiKeyAuth: []
+        ApiTimestamp: []
+        ApiNonce: []
+        ApiSignature: []
+      parameters:
+      - "$ref": "#/components/parameters/AddressQuery"
+      - "$ref": "#/components/parameters/LocaleQuery"
+      responses:
+        '200':
+          description: Orders
+          content:
+            application/json:
+              schema:
+                allOf:
+                - "$ref": "#/components/schemas/ApiResponse"
+                - type: object
+                  properties:
+                    data:
+                      "$ref": "#/components/schemas/OrderList"
+        '401':
+          "$ref": "#/components/responses/Unauthorized"
+  "/orders/{order_id}":
+    get:
+      tags:
+      - Orders
+      summary: Get an order by master order id
+      description: Returns `ORDER_NOT_FOUND` when the order does not exist or does
+        not belong to the current account.
+      operationId: getOrder
+      security:
+      - ApiKeyAuth: []
+        ApiTimestamp: []
+        ApiNonce: []
+        ApiSignature: []
+      parameters:
+      - "$ref": "#/components/parameters/OrderId"
+      - "$ref": "#/components/parameters/AddressQuery"
+      - "$ref": "#/components/parameters/LocaleQuery"
+      responses:
+        '200':
+          description: Order
+          content:
+            application/json:
+              schema:
+                allOf:
+                - "$ref": "#/components/schemas/ApiResponse"
+                - type: object
+                  properties:
+                    data:
+                      "$ref": "#/components/schemas/Order"
+        '404':
+          "$ref": "#/components/responses/NotFound"
+    delete:
+      tags:
+      - Orders
+      summary: Cancel an order
+      operationId: cancelOrder
+      parameters:
+      - "$ref": "#/components/parameters/IdempotencyKey"
+      - "$ref": "#/components/parameters/OrderId"
+      security:
+      - ApiKeyAuth: []
+        ApiTimestamp: []
+        ApiNonce: []
+        ApiSignature: []
+      responses:
+        '200':
+          description: Cancel requested
+          content:
+            application/json:
+              schema:
+                allOf:
+                - "$ref": "#/components/schemas/ApiResponse"
+                - type: object
+                  properties:
+                    data:
+                      "$ref": "#/components/schemas/CancelOrderData"
+        '401':
+          "$ref": "#/components/responses/Unauthorized"
+  "/positions":
+    get:
+      tags:
+      - Positions
+      summary: List account positions
+      operationId: listPositions
+      security:
+      - ApiKeyAuth: []
+        ApiTimestamp: []
+        ApiNonce: []
+        ApiSignature: []
+      parameters:
+      - "$ref": "#/components/parameters/AddressQuery"
+      - "$ref": "#/components/parameters/MarketQuery"
+      - "$ref": "#/components/parameters/RedeemableQuery"
+      responses:
+        '200':
+          description: Positions
+          content:
+            application/json:
+              schema:
+                allOf:
+                - "$ref": "#/components/schemas/ApiResponse"
+                - type: object
+                  properties:
+                    data:
+                      "$ref": "#/components/schemas/PositionList"
+        '401':
+          "$ref": "#/components/responses/Unauthorized"
+  "/copytrade/configs":
+    get:
+      tags:
+      - Copytrade
+      summary: List copytrade configs
+      description: Returns an empty `items` array when the account has no copytrade
+        configs.
+      operationId: listCopytradeConfigs
+      security:
+      - ApiKeyAuth: []
+        ApiTimestamp: []
+        ApiNonce: []
+        ApiSignature: []
+      parameters:
+      - "$ref": "#/components/parameters/Limit"
+      - "$ref": "#/components/parameters/Cursor"
+      responses:
+        '200':
+          description: Copytrade configs
+          content:
+            application/json:
+              schema:
+                allOf:
+                - "$ref": "#/components/schemas/ApiResponse"
+                - type: object
+                  properties:
+                    data:
+                      "$ref": "#/components/schemas/CopytradeConfigList"
+        '400':
+          "$ref": "#/components/responses/BadRequest"
+    post:
+      tags:
+      - Copytrade
+      summary: Create a copytrade config
+      description: |
+        Create a copytrade configuration for the account represented by the API key.
+
+        This endpoint is included in v1. It requires API key HMAC signature and
+        does not require TOTP. The openapi service maps the API key to
+        `master_telegram_id` and calls master `CreateCopyTradeConfig`.
+      operationId: createCopytradeConfig
+      parameters:
+      - "$ref": "#/components/parameters/IdempotencyKey"
+      security:
+      - ApiKeyAuth: []
+        ApiTimestamp: []
+        ApiNonce: []
+        ApiSignature: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              "$ref": "#/components/schemas/CopytradeConfigInput"
+            example:
+              target_address: '0x0000000000000000000000000000000000000000'
+              tag: leader A
+              copy_percentage: '100'
+              copy_fixed_amount: ''
+              max_token_spend: '1000'
+              total_token_spend: '5000'
+              min_copy_amount_per_trade: '1'
+              max_copy_amount_per_trade: '100'
+              min_price: '0.01'
+              max_price: '0.99'
+              slippage: '2'
+              copy_buy: true
+              copy_sell: true
+              limit_order_copy: false
+              sell_limit_order_copy: false
+              reverse_copy: false
+              keyword_whitelist: []
+              keyword_blacklist: []
+      responses:
+        '200':
+          description: Copytrade config created
+          content:
+            application/json:
+              schema:
+                allOf:
+                - "$ref": "#/components/schemas/ApiResponse"
+                - type: object
+                  properties:
+                    data:
+                      "$ref": "#/components/schemas/CopytradeConfig"
+        '401':
+          "$ref": "#/components/responses/Unauthorized"
+        '422':
+          "$ref": "#/components/responses/ValidationFailed"
+        '429':
+          "$ref": "#/components/responses/RateLimited"
+        '502':
+          "$ref": "#/components/responses/DependencyUnavailable"
+  "/copytrade/configs/{config_id}":
+    get:
+      tags:
+      - Copytrade
+      summary: Get a copytrade config
+      description: Returns `COPYTRADE_CONFIG_NOT_FOUND` when the config does not exist
+        or does not belong to the current account.
+      operationId: getCopytradeConfig
+      parameters:
+      - "$ref": "#/components/parameters/ConfigId"
+      security:
+      - ApiKeyAuth: []
+        ApiTimestamp: []
+        ApiNonce: []
+        ApiSignature: []
+      responses:
+        '200':
+          description: Copytrade config
+          content:
+            application/json:
+              schema:
+                allOf:
+                - "$ref": "#/components/schemas/ApiResponse"
+                - type: object
+                  properties:
+                    data:
+                      "$ref": "#/components/schemas/CopytradeConfig"
+        '404':
+          "$ref": "#/components/responses/NotFound"
+    patch:
+      tags:
+      - Copytrade
+      summary: Update a copytrade config
+      description: Updates copytrade config fields supported by the master update
+        RPC. `target_address` is optional for PATCH; when omitted the target address
+        is not changed. Public boolean fields are desired final states and the gateway
+        translates them to the current master toggle protocol. `keyword_whitelist`
+        and `keyword_blacklist` are create-only in v1 and are rejected on update.
+      operationId: updateCopytradeConfig
+      parameters:
+      - "$ref": "#/components/parameters/IdempotencyKey"
+      - "$ref": "#/components/parameters/ConfigId"
+      security:
+      - ApiKeyAuth: []
+        ApiTimestamp: []
+        ApiNonce: []
+        ApiSignature: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              "$ref": "#/components/schemas/CopytradeConfigUpdateInput"
+      responses:
+        '200':
+          description: Copytrade config updated
+          content:
+            application/json:
+              schema:
+                allOf:
+                - "$ref": "#/components/schemas/ApiResponse"
+                - type: object
+                  properties:
+                    data:
+                      "$ref": "#/components/schemas/CopytradeConfig"
+        '404':
+          "$ref": "#/components/responses/NotFound"
+        '422':
+          "$ref": "#/components/responses/ValidationFailed"
+    delete:
+      tags:
+      - Copytrade
+      summary: Disable a copytrade config
+      operationId: deleteCopytradeConfig
+      parameters:
+      - "$ref": "#/components/parameters/IdempotencyKey"
+      - "$ref": "#/components/parameters/ConfigId"
+      security:
+      - ApiKeyAuth: []
+        ApiTimestamp: []
+        ApiNonce: []
+        ApiSignature: []
+      responses:
+        '200':
+          description: Copytrade config disabled
+          content:
+            application/json:
+              schema:
+                allOf:
+                - "$ref": "#/components/schemas/ApiResponse"
+                - type: object
+                  properties:
+                    data:
+                      "$ref": "#/components/schemas/CopytradeConfig"
+        '404':
+          "$ref": "#/components/responses/NotFound"
+  "/copytrade/configs/{config_id}/keywords":
+    post:
+      tags:
+      - Copytrade
+      summary: Add a copytrade keyword
+      description: |
+        Adds one keyword to a copytrade config whitelist or blacklist. This endpoint maps directly to master `CreateCopyTradeConfigKeyWord`.
+
+        Use this endpoint instead of PATCH `/copytrade/configs/{config_id}` for keyword changes.
+      operationId: createCopytradeConfigKeyword
+      parameters:
+      - "$ref": "#/components/parameters/IdempotencyKey"
+      - "$ref": "#/components/parameters/ConfigId"
+      security:
+      - ApiKeyAuth: []
+        ApiTimestamp: []
+        ApiNonce: []
+        ApiSignature: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              "$ref": "#/components/schemas/CopytradeKeywordInput"
+            example:
+              key_word: election
+              list_type: 1
+              config_type: 1
+      responses:
+        '200':
+          description: Keyword added
+          content:
+            application/json:
+              schema:
+                allOf:
+                - "$ref": "#/components/schemas/ApiResponse"
+                - type: object
+                  properties:
+                    data:
+                      type: object
+        '400':
+          "$ref": "#/components/responses/BadRequest"
+        '404':
+          "$ref": "#/components/responses/NotFound"
+        '422':
+          "$ref": "#/components/responses/ValidationFailed"
+  "/copytrade/configs/{config_id}/keywords/{key_word_id}":
+    delete:
+      tags:
+      - Copytrade
+      summary: Delete a copytrade keyword
+      description: 'Deletes one keyword binding from a copytrade config. OpenAPI first
+        checks that `config_id` belongs to the current account, then calls master
+        `DelCopyTradeConfigKeyWord` with `key_word_id`.
+
+'
+      operationId: deleteCopytradeConfigKeyword
+      parameters:
+      - "$ref": "#/components/parameters/IdempotencyKey"
+      - "$ref": "#/components/parameters/ConfigId"
+      - "$ref": "#/components/parameters/KeyWordId"
+      security:
+      - ApiKeyAuth: []
+        ApiTimestamp: []
+        ApiNonce: []
+        ApiSignature: []
+      responses:
+        '200':
+          description: Keyword deleted
+          content:
+            application/json:
+              schema:
+                allOf:
+                - "$ref": "#/components/schemas/ApiResponse"
+                - type: object
+                  properties:
+                    data:
+                      type: object
+        '404':
+          "$ref": "#/components/responses/NotFound"
+  "/copytrade/configs/{config_id}/market-types":
+    patch:
+      tags:
+      - Copytrade
+      summary: Update copytrade market type filters
+      description: |
+        Updates the market-type switches for a copytrade config. This endpoint maps directly to master `UpdateCopyMarketsTypes`.
+
+        Each market type field follows `tx.proto`/`param.proto`: `1` means enabled, `2` means disabled. Omit a field to leave that switch unchanged. `config_id` comes from the path; do not send it in the body.
+      operationId: updateCopytradeMarketTypes
+      parameters:
+      - "$ref": "#/components/parameters/IdempotencyKey"
+      - "$ref": "#/components/parameters/ConfigId"
+      security:
+      - ApiKeyAuth: []
+        ApiTimestamp: []
+        ApiNonce: []
+        ApiSignature: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              "$ref": "#/components/schemas/CopytradeMarketTypesInput"
+            example:
+              config_type: 1
+              crypto: 1
+              sports: 2
+      responses:
+        '200':
+          description: Market types updated
+          content:
+            application/json:
+              schema:
+                allOf:
+                - "$ref": "#/components/schemas/ApiResponse"
+                - type: object
+                  properties:
+                    data:
+                      type: object
+        '400':
+          "$ref": "#/components/responses/BadRequest"
+        '404':
+          "$ref": "#/components/responses/NotFound"
+        '422':
+          "$ref": "#/components/responses/ValidationFailed"
+  "/afk/strategies":
+    get:
+      tags:
+      - AFK
+      summary: List AFK strategies
+      description: Lists AFK automatic trading strategies owned by the current account.
+        Maps to master `GetAFKStrategies`.
+      operationId: listAFKStrategies
+      security:
+      - ApiKeyAuth: []
+        ApiTimestamp: []
+        ApiNonce: []
+        ApiSignature: []
+      responses:
+        '200':
+          description: AFK strategies
+          content:
+            application/json:
+              schema:
+                allOf:
+                - "$ref": "#/components/schemas/ApiResponse"
+                - type: object
+                  properties:
+                    data:
+                      "$ref": "#/components/schemas/AFKStrategyList"
+        '401':
+          "$ref": "#/components/responses/Unauthorized"
+    post:
+      tags:
+      - AFK
+      summary: Create an AFK strategy
+      description: Creates an AFK automatic trading strategy. Maps to master `CreateAFKStrategy`.
+      operationId: createAFKStrategy
+      parameters:
+      - "$ref": "#/components/parameters/IdempotencyKey"
+      security:
+      - ApiKeyAuth: []
+        ApiTimestamp: []
+        ApiNonce: []
+        ApiSignature: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              "$ref": "#/components/schemas/AFKStrategyInput"
+      responses:
+        '200':
+          description: AFK strategy created
+          content:
+            application/json:
+              schema:
+                allOf:
+                - "$ref": "#/components/schemas/ApiResponse"
+                - type: object
+                  properties:
+                    data:
+                      "$ref": "#/components/schemas/AFKStrategy"
+        '422':
+          "$ref": "#/components/responses/ValidationFailed"
+  "/afk/strategies/{strategy_id}":
+    get:
+      tags:
+      - AFK
+      summary: Get an AFK strategy
+      description: Returns one AFK strategy owned by the current account. Maps to
+        master `GetAFKStrategy`.
+      operationId: getAFKStrategy
+      parameters:
+      - "$ref": "#/components/parameters/StrategyId"
+      security:
+      - ApiKeyAuth: []
+        ApiTimestamp: []
+        ApiNonce: []
+        ApiSignature: []
+      responses:
+        '200':
+          description: AFK strategy
+          content:
+            application/json:
+              schema:
+                allOf:
+                - "$ref": "#/components/schemas/ApiResponse"
+                - type: object
+                  properties:
+                    data:
+                      "$ref": "#/components/schemas/AFKStrategy"
+        '404':
+          "$ref": "#/components/responses/NotFound"
+    patch:
+      tags:
+      - AFK
+      summary: Update an AFK strategy
+      description: Updates an AFK automatic trading strategy. Maps to master `UpdateAFKStrategy`.
+      operationId: updateAFKStrategy
+      parameters:
+      - "$ref": "#/components/parameters/IdempotencyKey"
+      - "$ref": "#/components/parameters/StrategyId"
+      security:
+      - ApiKeyAuth: []
+        ApiTimestamp: []
+        ApiNonce: []
+        ApiSignature: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              "$ref": "#/components/schemas/AFKStrategyUpdateInput"
+      responses:
+        '200':
+          description: AFK strategy updated
+          content:
+            application/json:
+              schema:
+                allOf:
+                - "$ref": "#/components/schemas/ApiResponse"
+                - type: object
+                  properties:
+                    data:
+                      "$ref": "#/components/schemas/AFKStrategy"
+        '404':
+          "$ref": "#/components/responses/NotFound"
+        '422':
+          "$ref": "#/components/responses/ValidationFailed"
+  "/afk/records":
+    get:
+      tags:
+      - AFK
+      summary: List AFK records
+      description: Returns AFK transaction records from master `GetAFKRecords`, backed
+        by `tg_afk_records`, with cursor pagination.
+      operationId: listAFKRecords
+      security:
+      - ApiKeyAuth: []
+        ApiTimestamp: []
+        ApiNonce: []
+        ApiSignature: []
+      parameters:
+      - name: strategy_id
+        in: query
+        required: false
+        schema:
+          type: integer
+          minimum: 1
+        description: AFK strategy id filter.
+      - name: status
+        in: query
+        required: false
+        schema:
+          type: integer
+          enum:
+          - 1
+          - 2
+          - 3
+          - 4
+          - 5
+        description: 'Optional AFK record status filter: 1=success, 2=failed, 3=waiting,
+          4=cancel, 5=partially. When status is 2, `error_msg` contains the failure
+          reason.'
+      - "$ref": "#/components/parameters/Limit"
+      - "$ref": "#/components/parameters/Cursor"
+      responses:
+        '200':
+          description: AFK record list
+          content:
+            application/json:
+              schema:
+                allOf:
+                - "$ref": "#/components/schemas/ApiResponse"
+                - type: object
+                  properties:
+                    data:
+                      "$ref": "#/components/schemas/AFKRecordList"
+        '400':
+          "$ref": "#/components/responses/BadRequest"
+  "/copytrade/records":
+    get:
+      tags:
+      - Copytrade
+      summary: List copytrade records
+      operationId: listCopytradeRecords
+      security:
+      - ApiKeyAuth: []
+        ApiTimestamp: []
+        ApiNonce: []
+        ApiSignature: []
+      parameters:
+      - name: config_id
+        in: query
+        required: false
+        schema:
+          type: integer
+          minimum: 1
+      - name: status
+        in: query
+        required: false
+        schema:
+          type: integer
+          enum:
+          - 1
+          - 2
+          - 3
+          - 4
+          - 5
+        description: 'Optional record status filter: 1=success, 2=failed, 3=waiting,
+          4=cancel, 5=partially. When status is 2, `error_msg` contains the failure
+          reason when returned by master.'
+      - "$ref": "#/components/parameters/Limit"
+      - "$ref": "#/components/parameters/Cursor"
+      responses:
+        '200':
+          description: Copytrade records
+          content:
+            application/json:
+              schema:
+                allOf:
+                - "$ref": "#/components/schemas/ApiResponse"
+                - type: object
+                  properties:
+                    data:
+                      "$ref": "#/components/schemas/CopytradeRecordList"
+        '400':
+          "$ref": "#/components/responses/BadRequest"
+components:
+  securitySchemes:
+    ApiKeyAuth:
+      type: apiKey
+      in: header
+      name: X-API-Key
+      description: API key id.
+    ApiTimestamp:
+      type: apiKey
+      in: header
+      name: X-Timestamp
+      description: Unix timestamp in seconds. Allowed clock skew is 30 seconds.
+    ApiNonce:
+      type: apiKey
+      in: header
+      name: X-Nonce
+      description: Random nonce. It must not repeat within the timestamp window.
+    ApiSignature:
+      type: apiKey
+      in: header
+      name: X-Signature
+      description: |
+        HMAC-SHA256 signature.
+
+        Canonical string:
+        `METHOD + "\n" + PATH + "\n" + QUERY + "\n" + TIMESTAMP + "\n" + NONCE + "\n" + BODY_SHA256`.
+  parameters:
+    IdempotencyKey:
+      name: Idempotency-Key
+      in: header
+      required: false
+      description: Optional idempotency key. V1 does not reject requests that omit
+        it.
+      schema:
+        type: string
+        maxLength: 128
+    RequiredIdempotencyKey:
+      name: Idempotency-Key
+      in: header
+      required: true
+      description: Required for withdrawals. This key identifies one business withdrawal
+        request and prevents duplicate withdrawal creation or submission when the
+        client retries after timeout, network failure, or double-click. Retry the
+        same withdrawal with the same Idempotency-Key and exactly the same request
+        body. Use a fresh timestamp, nonce, and signature for every signed HTTP request.
+        Reusing the same key with a different body returns CONFLICT.
+      schema:
+        type: string
+        maxLength: 128
+    WithdrawId:
+      name: withdraw_id
+      in: path
+      required: true
+      schema:
+        type: string
+        example: wd_202606011200000001
+    OrderId:
+      name: order_id
+      in: path
+      required: true
+      schema:
+        type: string
+        example: 0xorder
+    ConfigId:
+      name: config_id
+      in: path
+      required: true
+      schema:
+        type: string
+        example: '123'
+    KeyWordId:
+      name: key_word_id
+      in: path
+      required: true
+      description: Keyword record id returned by master/query data. Used only to delete
+        the keyword binding.
+      schema:
+        type: integer
+        minimum: 1
+        example: 456
+    StrategyId:
+      name: strategy_id
+      in: path
+      required: true
+      description: AFK strategy config id.
+      schema:
+        type: string
+        example: '123'
+    Limit:
+      name: limit
+      in: query
+      required: false
+      schema:
+        type: integer
+        minimum: 1
+        maximum: 200
+        default: 50
+    Cursor:
+      name: cursor
+      in: query
+      required: false
+      schema:
+        type: string
+      description: Cursor returned as `next_cursor` from the previous page. OpenAPI
+        does not support offset pagination.
+    ForceRefresh:
+      name: force_refresh
+      in: query
+      required: false
+      schema:
+        type: boolean
+        default: false
+      description: Optional wallet refresh flag forwarded to master. Omit or use false
+        for normal cached wallet reads.
+    AddressQuery:
+      name: address
+      in: query
+      required: false
+      schema:
+        type: string
+      description: Optional wallet address filter forwarded to master query APIs.
+    LocaleQuery:
+      name: locale
+      in: query
+      required: false
+      schema:
+        type: string
+        example: en
+      description: Optional locale forwarded to master order query APIs.
+    MarketQuery:
+      name: market
+      in: query
+      required: false
+      style: form
+      explode: true
+      schema:
+        type: array
+        items:
+          type: string
+      description: Optional repeated market filters, for example `?market=a&market=b`.
+    RedeemableQuery:
+      name: redeemable
+      in: query
+      required: false
+      schema:
+        type: boolean
+      description: Optional redeemable-position filter.
+  responses:
+    BadRequest:
+      description: Bad request
+      content:
+        application/json:
+          schema:
+            "$ref": "#/components/schemas/ErrorResponse"
+    Unauthorized:
+      description: Authentication failed
+      content:
+        application/json:
+          schema:
+            "$ref": "#/components/schemas/ErrorResponse"
+    Forbidden:
+      description: Forbidden
+      content:
+        application/json:
+          schema:
+            "$ref": "#/components/schemas/ErrorResponse"
+    NotFound:
+      description: Not found
+      content:
+        application/json:
+          schema:
+            "$ref": "#/components/schemas/ErrorResponse"
+    Conflict:
+      description: Conflict
+      content:
+        application/json:
+          schema:
+            "$ref": "#/components/schemas/ErrorResponse"
+    ValidationFailed:
+      description: Validation failed
+      content:
+        application/json:
+          schema:
+            "$ref": "#/components/schemas/ErrorResponse"
+    RateLimited:
+      description: Rate limited
+      headers:
+        Retry-After:
+          description: Seconds to wait before retrying the same rate-limited bucket.
+          schema:
+            type: integer
+            minimum: 1
+        X-RateLimit-Limit:
+          description: Effective limit for the bucket that rejected the request.
+          schema:
+            type: integer
+            minimum: 1
+        X-RateLimit-Remaining:
+          description: Remaining tokens in the bucket that rejected the request. Usually
+            0 on 429.
+          schema:
+            type: integer
+            minimum: 0
+        X-RateLimit-Reset:
+          description: Seconds until the bucket is expected to accept another request.
+          schema:
+            type: integer
+            minimum: 1
+      content:
+        application/json:
+          schema:
+            "$ref": "#/components/schemas/ErrorResponse"
+    DependencyUnavailable:
+      description: Upstream service unavailable
+      content:
+        application/json:
+          schema:
+            "$ref": "#/components/schemas/ErrorResponse"
+  schemas:
+    ApiResponse:
+      type: object
+      required:
+      - code
+      - message
+      - data
+      - request_id
+      properties:
+        code:
+          type: string
+          example: OK
+        message:
+          type: string
+          example: success
+        data:
+          description: Response payload. The concrete type is defined by each operation.
+        request_id:
+          type: string
+          example: req_202606011200000001
+    ErrorResponse:
+      allOf:
+      - "$ref": "#/components/schemas/ApiResponse"
+      - type: object
+        properties:
+          code:
+            "$ref": "#/components/schemas/ErrorCode"
+          data:
+            type: object
+            nullable: true
+            example: null
+    ErrorCode:
+      type: string
+      enum:
+      - OK
+      - BAD_REQUEST
+      - UNAUTHORIZED
+      - NOT_FOUND
+      - VALIDATION_FAILED
+      - CONFLICT
+      - RATE_LIMITED
+      - INTERNAL_ERROR
+      - MASTER_UNAVAILABLE
+      - ACCOUNT_DISABLED
+      - ACCOUNT_NOT_FOUND
+      - API_KEY_INVALID
+      - API_KEY_DISABLED
+      - API_KEY_LIMIT_EXCEEDED
+      - API_KEY_SIGNATURE_INVALID
+      - API_KEY_TIMESTAMP_EXPIRED
+      - API_KEY_NONCE_REPLAYED
+      - TOTP_NOT_ENABLED
+      - TOTP_CODE_INVALID
+      - TOTP_CODE_REPLAYED
+      - TOTP_TOO_MANY_FAILURES
+      - ORDER_PLACE_FAILED
+      - ORDER_CANCEL_FAILED
+      - ORDER_NOT_FOUND
+      - ORDER_INSUFFICIENT_BALANCE
+      - ORDER_RESULT_UNKNOWN
+      - WITHDRAW_2FA_REQUIRED
+      - WITHDRAW_NETWORK_UNSUPPORTED
+      - WITHDRAW_TOKEN_UNSUPPORTED
+      - WITHDRAW_ADDRESS_INVALID
+      - WITHDRAW_AMOUNT_INVALID
+      - WITHDRAW_CREATE_FAILED
+      - WITHDRAW_NOT_FOUND
+      - WITHDRAW_RESULT_UNKNOWN
+      - COPYTRADE_CONFIG_NOT_FOUND
+      - COPYTRADE_CONFIG_INVALID
+      - COPYTRADE_CREATE_FAILED
+      - COPYTRADE_UPDATE_FAILED
+    AccountId:
+      type: string
+      pattern: "^99[0-9]{20}$"
+      example: '9912345678901234564821'
+    ApiKey:
+      type: object
+      required:
+      - key_id
+      - name
+      - status
+      - scopes
+      - ip_whitelist
+      - created_at
+      properties:
+        key_id:
+          type: string
+          example: pk_abc
+        name:
+          type: string
+        status:
+          type: string
+          enum:
+          - active
+          - revoked
+          - disabled
+        scopes:
+          type: array
+          items:
+            type: string
+          example:
+          - "*"
+        ip_whitelist:
+          type: array
+          items:
+            type: string
+        last_used_at:
+          type: string
+          format: date-time
+          nullable: true
+        created_at:
+          type: string
+          format: date-time
+    CreateApiKeyData:
+      allOf:
+      - "$ref": "#/components/schemas/ApiKey"
+      - type: object
+        required:
+        - secret
+        properties:
+          secret:
+            type: string
+            description: API key secret. Shown only once.
+            example: sk_xxx
+    PartnerUserCreateRequest:
+      type: object
+      required:
+      - external_user_id
+      properties:
+        external_user_id:
+          type: string
+          description: Partner-side stable user id.
+          example: user_123
+        display_name:
+          type: string
+          example: Alice
+        email:
+          type: string
+          format: email
+          example: alice@example.com
+    PartnerUserData:
+      type: object
+      required:
+      - partner_account_id
+      - user_account_id
+      - external_user_id
+      - status
+      - wallet_status
+      - created_at
+      - updated_at
+      properties:
+        partner_account_id:
+          "$ref": "#/components/schemas/AccountId"
+        user_account_id:
+          "$ref": "#/components/schemas/AccountId"
+        external_user_id:
+          type: string
+          example: user_123
+        display_name:
+          type: string
+        email:
+          type: string
+        status:
+          type: string
+          enum:
+          - active
+          - disabled
+        wallet_status:
+          type: string
+          description: Wallet initialization status for this partner user. `ready`
+            means the user's custodial trading wallet has been initialized; `pending`
+            or `failed` means the partner may retry create-or-get for the same external_user_id
+            to initialize the wallet.
+          enum:
+          - pending
+          - ready
+          - failed
+        wallet_created:
+          type: boolean
+          nullable: true
+        wallet_initialized_at:
+          type: string
+          format: date-time
+          nullable: true
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+    PartnerUserListData:
+      type: object
+      required:
+      - items
+      properties:
+        items:
+          type: array
+          items:
+            "$ref": "#/components/schemas/PartnerUserData"
+        next_cursor:
+          type: string
+          nullable: true
+          description: Cursor for the next page. It is the last `user_account_id`
+            from the current page; omit it when this field is absent.
+    PartnerUserApiKeyCreateRequest:
+      type: object
+      required:
+      - name
+      properties:
+        name:
+          type: string
+          example: user trading key
+        scopes:
+          type: array
+          description: |
+            Optional scopes for the generated user API key. If omitted, the key receives these default scopes:
+            `trade:read`, `trade:order`, `trade:cancel`, `wallet:read`, `positions:read`,
+            `copytrade:read`, `copytrade:manage`, `afk:read`, and `afk:manage`.
+
+            The wildcard scope `*` is not accepted for user API keys. User API key scopes must be one of:
+            `trade:read`, `trade:order`, `trade:cancel`, `wallet:read`, `positions:read`,
+            `copytrade:read`, `copytrade:manage`, `afk:read`, or `afk:manage`.
+
+            `withdraw:create` is not supported for partner user API keys in V1 because withdrawals
+            require account-level TOTP. To enable this permission later, first add a partner-user TOTP binding flow,
+            then add `withdraw:create` to the allowed partner user key scopes.
+          items:
+            type: string
+          example:
+          - trade:order
+          - wallet:read
+    Wallet:
+      type: object
+      required:
+      - account_id
+      - network
+      - wallet_address
+      - balances
+      properties:
+        account_id:
+          "$ref": "#/components/schemas/AccountId"
+        network:
+          "$ref": "#/components/schemas/Network"
+        wallet_address:
+          type: string
+          example: '0x0000000000000000000000000000000000000000'
+        proxy_wallet:
+          type: string
+          nullable: true
+        sol_wallet:
+          type: string
+          nullable: true
+          description: Solana deposit address.
+        account_value:
+          type: string
+          nullable: true
+          description: Account balance.
+        available_trade:
+          type: string
+          nullable: true
+          description: Available trading balance.
+        deposit_addr:
+          type: string
+          nullable: true
+          description: EVM deposit address.
+        tag:
+          type: string
+          nullable: true
+          description: Wallet alias.
+        balances:
+          type: array
+          items:
+            "$ref": "#/components/schemas/Balance"
+    Balance:
+      type: object
+      required:
+      - token
+      - amount
+      properties:
+        token:
+          type: string
+          example: USDC
+        token_address:
+          type: string
+          nullable: true
+        amount:
+          type: string
+          example: '100.25'
+    Network:
+      type: string
+      enum:
+      - polygon
+    CreateWithdrawalRequest:
+      type: object
+      required:
+      - network
+      - token
+      - amount
+      - destination
+      - totp_code
+      properties:
+        network:
+          "$ref": "#/components/schemas/Network"
+        token:
+          type: string
+          description: Polygon token contract address the recipient should receive.
+            Gateway always withdraws PUSD internally and passes this address to master
+            as the requested output token. Supported values are USDC `0x3c499c542cEF5E3811e1192ce70d8cC03d5c3359`,
+            USDC.e `0x2791Bca1f2de4661ED88A30C99A7a9449Aa84174`, USDT `0xc2132D05D31c914a87C6611C10748AEb04B58e8F`,
+            and PUSD `0xC011a7E12a19f7B1f670d46F03B03f3342E82DFB`.
+          enum:
+          - '0x3c499c542cEF5E3811e1192ce70d8cC03d5c3359'
+          - '0x2791Bca1f2de4661ED88A30C99A7a9449Aa84174'
+          - '0xc2132D05D31c914a87C6611C10748AEb04B58e8F'
+          - '0xC011a7E12a19f7B1f670d46F03B03f3342E82DFB'
+          example: '0x2791Bca1f2de4661ED88A30C99A7a9449Aa84174'
+        amount:
+          type: string
+          example: '10.5'
+        destination:
+          type: string
+          example: '0x0000000000000000000000000000000000000000'
+        totp_code:
+          type: string
+          minLength: 6
+          maxLength: 6
+    WithdrawalCreated:
+      type: object
+      required:
+      - withdraw_id
+      - status
+      properties:
+        withdraw_id:
+          type: string
+          example: wd_202606011200000001
+        status:
+          "$ref": "#/components/schemas/WithdrawalStatus"
+    Withdrawal:
+      allOf:
+      - "$ref": "#/components/schemas/WithdrawalCreated"
+      - type: object
+        required:
+        - network
+        - token
+        - amount
+        - destination
+        - created_at
+        - updated_at
+        properties:
+          network:
+            "$ref": "#/components/schemas/Network"
+          token:
+            type: string
+          amount:
+            type: string
+          destination:
+            type: string
+          tx_hash:
+            type: string
+            nullable: true
+          created_at:
+            type: string
+            format: date-time
+          updated_at:
+            type: string
+            format: date-time
+    WithdrawalStatus:
+      type: string
+      enum:
+      - processing
+      - submitting
+      - submitted
+      - succeeded
+      - failed
+    PlaceOrderRequest:
+      type: object
+      required:
+      - asset
+      - side
+      properties:
+        asset:
+          type: string
+        side:
+          type: string
+          enum:
+          - buy
+          - sell
+        amount_usd:
+          type: string
+          nullable: true
+        price:
+          type: string
+          nullable: true
+        size:
+          type: string
+          nullable: true
+        expiration:
+          type: integer
+          format: int64
+          nullable: true
+        sell_all:
+          type: boolean
+          default: false
+        sell_percentage:
+          type: string
+          nullable: true
+        metadata:
+          "$ref": "#/components/schemas/OrderMetadata"
+    OrderMetadata:
+      type: object
+      properties:
+        title:
+          type: string
+        slug:
+          type: string
+        condition_id:
+          type: string
+        outcome:
+          type: string
+    OrderResult:
+      type: object
+      required:
+      - order_id
+      - filled
+      properties:
+        order_id:
+          type: string
+        filled:
+          type: boolean
+        tx_hash:
+          type: string
+        sell_size:
+          type: string
+    CancelOrderData:
+      type: object
+      required:
+      - order_id
+      - status
+      properties:
+        order_id:
+          type: string
+        status:
+          type: string
+          enum:
+          - cancel_requested
+    Order:
+      type: object
+      required:
+      - order_id
+      - status
+      - asset
+      - side
+      properties:
+        order_id:
+          type: string
+        status:
+          "$ref": "#/components/schemas/OrderStatus"
+        asset:
+          type: string
+        side:
+          type: string
+          enum:
+          - buy
+          - sell
+        price:
+          type: string
+          nullable: true
+        size:
+          type: string
+          nullable: true
+        created_at:
+          type: string
+          format: date-time
+          nullable: true
+    OrderStatus:
+      type: string
+      enum:
+      - open
+      - filled
+      - canceled
+      - failed
+      - unknown
+    OrderList:
+      type: object
+      required:
+      - items
+      properties:
+        items:
+          type: array
+          items:
+            "$ref": "#/components/schemas/Order"
+    Position:
+      type: object
+      required:
+      - asset
+      - size
+      properties:
+        asset:
+          type: string
+        condition_id:
+          type: string
+        outcome:
+          type: string
+        size:
+          type: string
+        avg_price:
+          type: string
+          nullable: true
+        current_price:
+          type: string
+          nullable: true
+        value:
+          type: string
+          nullable: true
+        pnl:
+          type: string
+          nullable: true
+    PositionList:
+      type: object
+      required:
+      - items
+      properties:
+        items:
+          type: array
+          items:
+            "$ref": "#/components/schemas/Position"
+    AFKStatus:
+      type: string
+      enum:
+      - running
+      - paused
+      - disabled
+      description: Public AFK strategy status. Maps to master status 1, 0, 2 respectively.
+    AFKStrategyInput:
+      type: object
+      required:
+      - market
+      - side
+      - buy_amount
+      properties:
+        tag:
+          type: string
+          description: User-visible strategy label. Maps to master `tag`.
+        market:
+          type: string
+          description: Market identifier or market group configured for the AFK strategy.
+            Maps to master `market`.
+        period:
+          type: integer
+          description: Trading period/window value. Maps to master `period`.
+        side:
+          type: integer
+          enum:
+          - 1
+          - 2
+          description: Direction filter; `1` means Up, `2` means Down. Maps to master
+            `side`.
+        time_start_sec:
+          type: integer
+          format: int64
+          description: Start time in Unix seconds. Maps to master `time_start_sec`.
+        time_end_sec:
+          type: integer
+          format: int64
+          description: End time in Unix seconds. Maps to master `time_end_sec`.
+        min_price:
+          type: string
+          description: Minimum allowed price. Decimal string.
+        max_price:
+          type: string
+          description: Maximum allowed price. Decimal string.
+        price_delta_min:
+          type: string
+          description: Minimum price delta filter. Decimal string.
+        price_delta_max:
+          type: string
+          description: Maximum price delta filter. Decimal string.
+        buy_amount:
+          type: string
+          description: Buy amount per AFK order. Decimal string.
+        limit_price:
+          type: string
+          description: Limit order price when `limit_order_copy=1`. Decimal string.
+        order_expired_ttl_seconds:
+          type: integer
+          description: Limit order expiration TTL in seconds.
+        total_rounds:
+          type: integer
+          description: Maximum number of AFK trading rounds.
+        take_profit_percentage:
+          type: string
+          description: Take-profit percentage trigger. Decimal string.
+        take_profit_price:
+          type: string
+          description: Take-profit price trigger. Decimal string.
+        stop_loss_percentage:
+          type: string
+          description: Stop-loss percentage trigger. Decimal string.
+        stop_loss_price:
+          type: string
+          description: Stop-loss price trigger. Decimal string.
+        limit_order_copy:
+          type: integer
+          enum:
+          - 0
+          - 1
+          description: Order mode; `0` means market order, `1` means limit order.
+        slippage:
+          type: string
+          description: Market order slippage percentage string, for example `2` means
+            2%.
+        use_kdj:
+          type: integer
+          enum:
+          - 0
+          - 1
+          description: KDJ indicator filter switch; `0` disabled, `1` enabled.
+        use_macd:
+          type: integer
+          enum:
+          - 0
+          - 1
+          description: MACD indicator filter switch; `0` disabled, `1` enabled.
+        use_atr:
+          type: integer
+          enum:
+          - 0
+          - 1
+          description: ATR indicator filter switch; `0` disabled, `1` enabled.
+    AFKStrategyUpdateInput:
+      allOf:
+      - "$ref": "#/components/schemas/AFKStrategyInput"
+      - type: object
+        properties:
+          status:
+            "$ref": "#/components/schemas/AFKStatus"
+    AFKStrategy:
+      allOf:
+      - "$ref": "#/components/schemas/AFKStrategyInput"
+      - type: object
+        required:
+        - config_id
+        - status
+        properties:
+          config_id:
+            type: string
+            description: AFK strategy id from master `config_id`.
+          status:
+            "$ref": "#/components/schemas/AFKStatus"
+          created_at:
+            type: string
+            format: date-time
+            nullable: true
+            description: Strategy create time derived from master `create_dt`.
+    AFKStrategyList:
+      type: object
+      required:
+      - items
+      properties:
+        items:
+          type: array
+          items:
+            "$ref": "#/components/schemas/AFKStrategy"
+    AFKRecord:
+      type: object
+      additionalProperties: true
+      description: Master `AFKRecord` object from `tg_afk_records`.
+      properties:
+        record_id:
+          type: string
+        strategy_id:
+          type: integer
+          format: uint64
+        round_id:
+          type: integer
+          format: int64
+        wallet_address:
+          type: string
+        proxy_address:
+          type: string
+        tag:
+          type: string
+        trigger_asset_price:
+          type: string
+        trigger_btc_price:
+          type: string
+        trigger_btc_delta:
+          type: string
+        title:
+          type: string
+        event_slug:
+          type: string
+        slug:
+          type: string
+        conditional_id:
+          type: string
+        outcome:
+          type: string
+        asset:
+          type: string
+        closed:
+          type: boolean
+        side_type:
+          type: string
+        px:
+          type: string
+        amount:
+          type: string
+        amount_usd:
+          type: string
+        order_id:
+          type: string
+        hash:
+          type: string
+        timestamp:
+          type: integer
+          format: uint64
+        order_type:
+          type: string
+        status:
+          type: integer
+          enum:
+          - 1
+          - 2
+          - 3
+          - 4
+          - 5
+          description: 'Record status: 1=success, 2=failed, 3=waiting, 4=cancel, 5=partially.
+            For failed records (`2`), read `error_msg` for the failure reason.'
+        take_profit_percentage:
+          type: string
+        take_profit_price:
+          type: string
+        stop_loss_percentage:
+          type: string
+        stop_loss_price:
+          type: string
+        slippage:
+          type: string
+        spend_req_micro:
+          type: integer
+          format: uint64
+        spend_granted_micro:
+          type: integer
+          format: uint64
+        size_matched:
+          type: string
+        error_msg:
+          type: string
+          nullable: true
+          description: Failure reason when `status=2`, if returned by master.
+        create_dt:
+          type: integer
+          format: uint64
+        update_dt:
+          type: integer
+          format: uint64
+    AFKRecordList:
+      type: object
+      required:
+      - items
+      properties:
+        items:
+          type: array
+          items:
+            "$ref": "#/components/schemas/AFKRecord"
+        next_cursor:
+          type: string
+          nullable: true
+          description: Cursor for the next page. Use it as the next request's `cursor`.
+    CopytradeStatus:
+      type: string
+      enum:
+      - running
+      - paused
+      - disabled
+    CopytradeMarketTypesInput:
+      type: object
+      required:
+      - config_type
+      description: Market-type switches used by `OnlyCopyMarketsTypes`. For switch
+        fields, `1` means enabled and `2` means disabled; omitted fields are not changed.
+      properties:
+        all:
+          type: integer
+          enum:
+          - 1
+          - 2
+          description: Master `all`; enables or disables copying all supported market
+            types.
+        sports:
+          type: integer
+          enum:
+          - 1
+          - 2
+          description: Master `sports`; enables or disables sports markets.
+        crypto:
+          type: integer
+          enum:
+          - 1
+          - 2
+          description: Master `crypto`; enables or disables crypto markets as a group.
+        crypto_m5:
+          type: integer
+          enum:
+          - 1
+          - 2
+          description: Master `crypto_m5`; enables or disables 5-minute crypto markets.
+        crypto_m15:
+          type: integer
+          enum:
+          - 1
+          - 2
+          description: Master `crypto_m15`; enables or disables 15-minute crypto markets.
+        crypto_h1:
+          type: integer
+          enum:
+          - 1
+          - 2
+          description: Master `crypto_h1`; enables or disables 1-hour crypto markets.
+        crypto_h4:
+          type: integer
+          enum:
+          - 1
+          - 2
+          description: Master `crypto_h4`; enables or disables 4-hour crypto markets.
+        crypto_btc:
+          type: integer
+          enum:
+          - 1
+          - 2
+          description: Master `crypto_btc`; enables or disables BTC crypto markets.
+        crypto_eth:
+          type: integer
+          enum:
+          - 1
+          - 2
+          description: Master `crypto_eth`; enables or disables ETH crypto markets.
+        crypto_sol:
+          type: integer
+          enum:
+          - 1
+          - 2
+          description: Master `crypto_sol`; enables or disables SOL crypto markets.
+        crypto_xrp:
+          type: integer
+          enum:
+          - 1
+          - 2
+          description: Master `crypto_xrp`; enables or disables XRP crypto markets.
+        politics:
+          type: integer
+          enum:
+          - 1
+          - 2
+          description: Master `politics`; enables or disables politics markets.
+        weather:
+          type: integer
+          enum:
+          - 1
+          - 2
+          description: Master `weather`; enables or disables weather markets.
+        other:
+          type: integer
+          enum:
+          - 1
+          - 2
+          description: Master `other`; enables or disables uncategorized/other markets.
+        config_type:
+          type: integer
+          enum:
+          - 1
+          - 2
+          description: Master `config_type`; `1` means an application copytrade config,
+            `2` means a template config.
+    CopytradeKeywordInput:
+      type: object
+      required:
+      - key_word
+      - list_type
+      - config_type
+      properties:
+        key_word:
+          type: string
+          description: Keyword text to add to the config keyword list. Maps to master
+            `key_word`.
+        list_type:
+          type: integer
+          enum:
+          - 1
+          - 2
+          description: Master `list_type`; `1` means whitelist, `2` means blacklist.
+        config_type:
+          type: integer
+          enum:
+          - 1
+          - 2
+          description: Master `config_type`; `1` means an application copytrade config,
+            `2` means a template config.
+    CopytradeConfigInput:
+      type: object
+      required:
+      - target_address
+      properties:
+        target_address:
+          type: string
+          description: Trader wallet address to follow. Maps to master `target_address`.
+        tag:
+          type: string
+          description: User-visible label for this copytrade config. Maps to master
+            `tag`.
+        copy_percentage:
+          type: string
+          description: Percentage of the trader's order size to copy. Decimal string;
+            maps to master `copy_percentage`.
+        limit_order_copy:
+          type: boolean
+          description: Whether to copy buy limit orders. On PATCH this is a desired
+            final public state; OpenAPI sends the master toggle flag only when the
+            state must change.
+        limit_order_validity_period:
+          type: string
+          description: Validity period for copied buy limit orders. Decimal/integer
+            string forwarded to master `limit_order_validity_period`.
+        max_limit_order_price_diff:
+          type: string
+          description: Maximum allowed price difference for copied buy limit orders.
+            Decimal string forwarded to master `max_limit_order_price_diff`.
+        max_token_spend:
+          type: string
+          description: Maximum token spend cap for this config. Decimal string forwarded
+            to master `max_token_spend`.
+        total_token_spend:
+          type: string
+          description: Total token spend cap for this config. Decimal string forwarded
+            to master `total_token_spend`.
+        buy_at_min:
+          type: boolean
+          description: Whether buy copy should use minimum-price behavior. Maps to
+            master `buy_at_min`.
+        copy_fixed_amount:
+          type: string
+          description: Fixed amount to copy per trade. Decimal string forwarded to
+            master `copy_fixed_amount`.
+        min_trader_trade_amount:
+          type: string
+          description: Minimum source trader trade amount required before copying.
+            Decimal string forwarded to master `min_trader_trade_amount`.
+        max_trader_trade_amount:
+          type: string
+          description: Maximum source trader trade amount allowed for copying. Decimal
+            string forwarded to master `max_trader_trade_amount`.
+        min_copy_amount_per_trade:
+          type: string
+          description: Minimum copied amount per trade. Decimal string forwarded to
+            master `min_copy_amount_per_trade`.
+        max_copy_amount_per_trade:
+          type: string
+          description: Maximum copied amount per trade. Decimal string forwarded to
+            master `max_copy_amount_per_trade`.
+        min_price:
+          type: string
+          description: Minimum market/order price allowed for copying. Decimal string
+            forwarded to master `min_price`.
+        max_price:
+          type: string
+          description: Maximum market/order price allowed for copying. Decimal string
+            forwarded to master `max_price`.
+        slippage:
+          type: string
+          description: Buy-side market-order slippage tolerance. Decimal string forwarded
+            to master `slippage`.
+        max_spend_per_market:
+          type: string
+          description: Maximum spend cap per market. Decimal string forwarded to master
+            `max_spend_per_market`.
+        max_holder_market_number:
+          type: string
+          description: Maximum number of holder markets allowed. Integer string forwarded
+            to master `max_holder_market_number`.
+        take_profit_percentage:
+          type: string
+          description: Take-profit trigger percentage. Decimal string forwarded to
+            master `take_profit_percentage`.
+        take_profit_price:
+          type: string
+          description: Take-profit trigger price. Decimal string forwarded to master
+            `take_profit_price`.
+        stop_loss_percentage:
+          type: string
+          description: Stop-loss trigger percentage. Decimal string forwarded to master
+            `stop_loss_percentage`.
+        stop_loss_price:
+          type: string
+          description: Stop-loss trigger price. Decimal string forwarded to master
+            `stop_loss_price`.
+        copy_buy:
+          type: boolean
+          description: Whether buy trades are copied. On PATCH this is a desired final
+            public state; OpenAPI sends the master toggle flag only when the state
+            must change.
+        copy_sell:
+          type: boolean
+          description: Whether sell trades are copied. On PATCH this is a desired
+            final public state; OpenAPI sends the master toggle flag only when the
+            state must change.
+        market_sell_slippage:
+          type: string
+          description: Sell-side market-order slippage tolerance. Decimal string forwarded
+            to master `market_sell_slippage`.
+        sell_limit_order_copy:
+          type: boolean
+          description: Whether to copy sell limit orders. On PATCH this is a desired
+            final public state; OpenAPI sends the master toggle flag only when the
+            state must change.
+        sell_limit_order_price_diff:
+          type: string
+          description: Maximum allowed price difference for copied sell limit orders.
+            Decimal string forwarded to master `sell_limit_order_price_diff`.
+        sell_limit_order_validity_period:
+          type: string
+          description: Validity period for copied sell limit orders. Decimal/integer
+            string forwarded to master `sell_limit_order_validity_period`.
+        max_5m_market_start_time:
+          type: string
+          description: Earliest allowed start-time window for 5-minute markets. String
+            forwarded to master `max_5m_market_start_time`.
+        max_5m_market_end_time:
+          type: string
+          description: Latest allowed end-time window for 5-minute markets. String
+            forwarded to master `max_5m_market_end_time`.
+        max_15m_market_start_time:
+          type: string
+          description: Earliest allowed start-time window for 15-minute markets. String
+            forwarded to master `max_15m_market_start_time`.
+        max_15m_market_end_time:
+          type: string
+          description: Latest allowed end-time window for 15-minute markets. String
+            forwarded to master `max_15m_market_end_time`.
+        tp_balance_threshold:
+          type: string
+          description: Balance threshold used by take-profit logic. Decimal string
+            forwarded to master `tp_balance_threshold`.
+        sl_balance_threshold:
+          type: string
+          description: Balance threshold used by stop-loss logic. Decimal string forwarded
+            to master `sl_balance_threshold`.
+        reverse_copy:
+          type: boolean
+          description: Whether to invert copied trade direction. On PATCH this is
+            a desired final public state; OpenAPI sends the master toggle flag only
+            when the state must change.
+        is_master:
+          type: boolean
+          description: Create-only flag forwarded to master `is_master`; not supported
+            by update config RPC.
+        total_investment:
+          type: string
+          description: Create-only total investment amount. Decimal string forwarded
+            to master `total_investment`.
+        only_copy_markets_types:
+          "$ref": "#/components/schemas/CopytradeMarketTypesInput"
+        keyword_whitelist:
+          description: Create-time whitelist keywords. For later changes use POST
+            `/copytrade/configs/{config_id}/keywords`.
+          type: array
+          items:
+            type: string
+        keyword_blacklist:
+          description: Create-time blacklist keywords. For later changes use POST
+            `/copytrade/configs/{config_id}/keywords`.
+          type: array
+          items:
+            type: string
+        failure_retry:
+          type: string
+          description: Retry count/strategy value used after copy failure. String
+            forwarded to master `failure_retry`.
+        limit_expired_to_market:
+          type: boolean
+          description: Whether expired copied limit orders may fall back to market
+            orders. Maps to master `limit_expired_to_market`.
+        use_buy_order_book:
+          type: boolean
+          description: Whether buy copy uses order-book level settings. Maps to master
+            `use_buy_order_book`.
+        buy_bid_level:
+          type: string
+          description: Buy-side bid book level. String forwarded to master `buy_bid_level`.
+        buy_ask_level:
+          type: string
+          description: Buy-side ask book level. String forwarded to master `buy_ask_level`.
+        use_sell_order_book:
+          type: boolean
+          description: Whether sell copy uses order-book level settings. Maps to master
+            `use_sell_order_book`.
+        sell_bid_level:
+          type: string
+          description: Sell-side bid book level. String forwarded to master `sell_bid_level`.
+        sell_ask_level:
+          type: string
+          description: Sell-side ask book level. String forwarded to master `sell_ask_level`.
+        buy_order_book_mode:
+          type: string
+          description: Buy-side order-book mode. String forwarded to master `buy_order_book_mode`.
+        sell_order_book_mode:
+          type: string
+          description: Sell-side order-book mode. String forwarded to master `sell_order_book_mode`.
+        turbo_mode:
+          type: boolean
+          description: Whether to enable master turbo mode for this config. Maps to
+            master `turbo_mode`.
+        status:
+          "$ref": "#/components/schemas/CopytradeStatus"
+    CopytradeConfigUpdateInput:
+      type: object
+      properties:
+        target_address:
+          type: string
+          description: Optional on PATCH. Trader wallet address to follow; when omitted
+            the existing target address is not changed.
+        tag:
+          type: string
+          description: User-visible label for this copytrade config. Maps to master
+            `tag`.
+        copy_percentage:
+          type: string
+          description: Percentage of the trader's order size to copy. Decimal string;
+            maps to master `copy_percentage`.
+        limit_order_copy:
+          type: boolean
+          description: Whether to copy buy limit orders. On PATCH this is a desired
+            final public state; OpenAPI sends the master toggle flag only when the
+            state must change.
+        limit_order_validity_period:
+          type: string
+          description: Validity period for copied buy limit orders. Decimal/integer
+            string forwarded to master `limit_order_validity_period`.
+        max_limit_order_price_diff:
+          type: string
+          description: Maximum allowed price difference for copied buy limit orders.
+            Decimal string forwarded to master `max_limit_order_price_diff`.
+        max_token_spend:
+          type: string
+          description: Maximum token spend cap for this config. Decimal string forwarded
+            to master `max_token_spend`.
+        total_token_spend:
+          type: string
+          description: Total token spend cap for this config. Decimal string forwarded
+            to master `total_token_spend`.
+        buy_at_min:
+          type: boolean
+          description: Whether buy copy should use minimum-price behavior. Maps to
+            master `buy_at_min`.
+        copy_fixed_amount:
+          type: string
+          description: Fixed amount to copy per trade. Decimal string forwarded to
+            master `copy_fixed_amount`.
+        min_trader_trade_amount:
+          type: string
+          description: Minimum source trader trade amount required before copying.
+            Decimal string forwarded to master `min_trader_trade_amount`.
+        max_trader_trade_amount:
+          type: string
+          description: Maximum source trader trade amount allowed for copying. Decimal
+            string forwarded to master `max_trader_trade_amount`.
+        min_copy_amount_per_trade:
+          type: string
+          description: Minimum copied amount per trade. Decimal string forwarded to
+            master `min_copy_amount_per_trade`.
+        max_copy_amount_per_trade:
+          type: string
+          description: Maximum copied amount per trade. Decimal string forwarded to
+            master `max_copy_amount_per_trade`.
+        min_price:
+          type: string
+          description: Minimum market/order price allowed for copying. Decimal string
+            forwarded to master `min_price`.
+        max_price:
+          type: string
+          description: Maximum market/order price allowed for copying. Decimal string
+            forwarded to master `max_price`.
+        slippage:
+          type: string
+          description: Buy-side market-order slippage tolerance. Decimal string forwarded
+            to master `slippage`.
+        max_spend_per_market:
+          type: string
+          description: Maximum spend cap per market. Decimal string forwarded to master
+            `max_spend_per_market`.
+        max_holder_market_number:
+          type: string
+          description: Maximum number of holder markets allowed. Integer string forwarded
+            to master `max_holder_market_number`.
+        take_profit_percentage:
+          type: string
+          description: Take-profit trigger percentage. Decimal string forwarded to
+            master `take_profit_percentage`.
+        take_profit_price:
+          type: string
+          description: Take-profit trigger price. Decimal string forwarded to master
+            `take_profit_price`.
+        stop_loss_percentage:
+          type: string
+          description: Stop-loss trigger percentage. Decimal string forwarded to master
+            `stop_loss_percentage`.
+        stop_loss_price:
+          type: string
+          description: Stop-loss trigger price. Decimal string forwarded to master
+            `stop_loss_price`.
+        copy_buy:
+          type: boolean
+          description: Whether buy trades are copied. On PATCH this is a desired final
+            public state; OpenAPI sends the master toggle flag only when the state
+            must change.
+        copy_sell:
+          type: boolean
+          description: Whether sell trades are copied. On PATCH this is a desired
+            final public state; OpenAPI sends the master toggle flag only when the
+            state must change.
+        market_sell_slippage:
+          type: string
+          description: Sell-side market-order slippage tolerance. Decimal string forwarded
+            to master `market_sell_slippage`.
+        sell_limit_order_copy:
+          type: boolean
+          description: Whether to copy sell limit orders. On PATCH this is a desired
+            final public state; OpenAPI sends the master toggle flag only when the
+            state must change.
+        sell_limit_order_price_diff:
+          type: string
+          description: Maximum allowed price difference for copied sell limit orders.
+            Decimal string forwarded to master `sell_limit_order_price_diff`.
+        sell_limit_order_validity_period:
+          type: string
+          description: Validity period for copied sell limit orders. Decimal/integer
+            string forwarded to master `sell_limit_order_validity_period`.
+        max_5m_market_start_time:
+          type: string
+          description: Earliest allowed start-time window for 5-minute markets. String
+            forwarded to master `max_5m_market_start_time`.
+        max_5m_market_end_time:
+          type: string
+          description: Latest allowed end-time window for 5-minute markets. String
+            forwarded to master `max_5m_market_end_time`.
+        max_15m_market_start_time:
+          type: string
+          description: Earliest allowed start-time window for 15-minute markets. String
+            forwarded to master `max_15m_market_start_time`.
+        max_15m_market_end_time:
+          type: string
+          description: Latest allowed end-time window for 15-minute markets. String
+            forwarded to master `max_15m_market_end_time`.
+        tp_balance_threshold:
+          type: string
+          description: Balance threshold used by take-profit logic. Decimal string
+            forwarded to master `tp_balance_threshold`.
+        sl_balance_threshold:
+          type: string
+          description: Balance threshold used by stop-loss logic. Decimal string forwarded
+            to master `sl_balance_threshold`.
+        reverse_copy:
+          type: boolean
+          description: Whether to invert copied trade direction. On PATCH this is
+            a desired final public state; OpenAPI sends the master toggle flag only
+            when the state must change.
+        keyword_whitelist:
+          description: Not accepted on PATCH. Use POST `/copytrade/configs/{config_id}/keywords`.
+          readOnly: true
+          type: array
+          items:
+            type: string
+        keyword_blacklist:
+          description: Not accepted on PATCH. Use POST `/copytrade/configs/{config_id}/keywords`.
+          readOnly: true
+          type: array
+          items:
+            type: string
+        failure_retry:
+          type: string
+          description: Retry count/strategy value used after copy failure. String
+            forwarded to master `failure_retry`.
+        limit_expired_to_market:
+          type: boolean
+          description: Whether expired copied limit orders may fall back to market
+            orders. Maps to master `limit_expired_to_market`.
+        use_buy_order_book:
+          type: boolean
+          description: Whether buy copy uses order-book level settings. Maps to master
+            `use_buy_order_book`.
+        buy_bid_level:
+          type: string
+          description: Buy-side bid book level. String forwarded to master `buy_bid_level`.
+        buy_ask_level:
+          type: string
+          description: Buy-side ask book level. String forwarded to master `buy_ask_level`.
+        use_sell_order_book:
+          type: boolean
+          description: Whether sell copy uses order-book level settings. Maps to master
+            `use_sell_order_book`.
+        sell_bid_level:
+          type: string
+          description: Sell-side bid book level. String forwarded to master `sell_bid_level`.
+        sell_ask_level:
+          type: string
+          description: Sell-side ask book level. String forwarded to master `sell_ask_level`.
+        buy_order_book_mode:
+          type: string
+          description: Buy-side order-book mode. String forwarded to master `buy_order_book_mode`.
+        sell_order_book_mode:
+          type: string
+          description: Sell-side order-book mode. String forwarded to master `sell_order_book_mode`.
+        turbo_mode:
+          type: boolean
+          description: Whether to enable master turbo mode for this config. Maps to
+            master `turbo_mode`.
+        status:
+          "$ref": "#/components/schemas/CopytradeStatus"
+    CopytradeConfig:
+      type: object
+      required:
+      - config_id
+      - target_address
+      - status
+      description: Public copytrade config. Mirrors master `CopyTradeConfig`; proto
+        zero `status=0` is exposed as `paused`.
+      properties:
+        telegram_id:
+          type: string
+          description: Master `telegram_id`.
+        config_id:
+          type: string
+          example: '123'
+          description: Master `config_id`.
+        target_address:
+          type: string
+          description: Master `target_address`.
+        tag:
+          type: string
+          nullable: true
+          description: Master `tag`.
+        copy_percentage:
+          type: string
+          nullable: true
+          description: Master `copy_percentage`.
+        limit_order_copy:
+          type: boolean
+          nullable: true
+          description: Master `limit_order_copy`.
+        limit_order_validity_period:
+          type: string
+          nullable: true
+          description: Master `limit_order_validity_period`.
+        max_limit_order_price_diff:
+          type: string
+          nullable: true
+          description: Master `max_limit_order_price_diff`.
+        max_token_spend:
+          type: string
+          nullable: true
+          description: Master `max_token_spend`.
+        total_token_spend:
+          type: string
+          nullable: true
+          description: Master `total_token_spend`.
+        buy_at_min:
+          type: boolean
+          nullable: true
+          description: Master `buy_at_min`.
+        create_dt:
+          type: string
+          nullable: true
+          description: Master `create_dt` unix timestamp as a string.
+        copy_fixed_amount:
+          type: string
+          nullable: true
+          description: Master `copy_fixed_amount`.
+        min_trader_trade_amount:
+          type: string
+          nullable: true
+          description: Master `min_trader_trade_amount`.
+        min_copy_amount_per_trade:
+          type: string
+          nullable: true
+          description: Master `min_copy_amount_per_trade`.
+        max_copy_amount_per_trade:
+          type: string
+          nullable: true
+          description: Master `max_copy_amount_per_trade`.
+        min_price:
+          type: string
+          nullable: true
+          description: Master `min_price`.
+        max_price:
+          type: string
+          nullable: true
+          description: Master `max_price`.
+        slippage:
+          type: string
+          nullable: true
+          description: Master `slippage`.
+        max_spend_per_market:
+          type: string
+          nullable: true
+          description: Master `max_spend_per_market`.
+        max_holder_market_number:
+          type: string
+          nullable: true
+          description: Master `max_holder_market_number`.
+        take_profit_percentage:
+          type: string
+          nullable: true
+          description: Master `take_profit_percentage`.
+        take_profit_price:
+          type: string
+          nullable: true
+          description: Master `take_profit_price`.
+        stop_loss_percentage:
+          type: string
+          nullable: true
+          description: Master `stop_loss_percentage`.
+        stop_loss_price:
+          type: string
+          nullable: true
+          description: Master `stop_loss_price`.
+        copy_buy:
+          type: boolean
+          nullable: true
+          description: Master `copy_buy`.
+        copy_sell:
+          type: boolean
+          nullable: true
+          description: Master `copy_sell`.
+        market_sell_slippage:
+          type: string
+          nullable: true
+          description: Master `market_sell_slippage`.
+        sell_limit_order_copy:
+          type: boolean
+          nullable: true
+          description: Master `sell_limit_order_copy`.
+        sell_limit_order_price_diff:
+          type: string
+          nullable: true
+          description: Master `sell_limit_order_price_diff`.
+        sell_limit_order_validity_period:
+          type: string
+          nullable: true
+          description: Master `sell_limit_order_validity_period`.
+        max_5m_market_start_time:
+          type: string
+          nullable: true
+          description: Master `max_5m_market_start_time`.
+        max_5m_market_end_time:
+          type: string
+          nullable: true
+          description: Master `max_5m_market_end_time`.
+        max_15m_market_start_time:
+          type: string
+          nullable: true
+          description: Master `max_15m_market_start_time`.
+        max_15m_market_end_time:
+          type: string
+          nullable: true
+          description: Master `max_15m_market_end_time`.
+        tp_balance_threshold:
+          type: string
+          nullable: true
+          description: Master `tp_balance_threshold`.
+        sl_balance_threshold:
+          type: string
+          nullable: true
+          description: Master `sl_balance_threshold`.
+        reverse_copy:
+          type: boolean
+          nullable: true
+          description: Master `reverse_copy`.
+        is_master:
+          type: boolean
+          nullable: true
+          description: Master `is_master`.
+        total_investment:
+          type: string
+          nullable: true
+          description: Master `total_investment`.
+        wallet_address:
+          type: string
+          nullable: true
+          description: Master `wallet_address`.
+        proxy_address:
+          type: string
+          nullable: true
+          description: Master `proxy_address`.
+        sub_address:
+          type: string
+          nullable: true
+          description: Master `sub_address`.
+        sub_proxy_address:
+          type: string
+          nullable: true
+          description: Master `sub_proxy_address`.
+        max_trader_trade_amount:
+          type: string
+          nullable: true
+          description: Master `max_trader_trade_amount`.
+        failure_retry:
+          type: string
+          nullable: true
+          description: Master `failure_retry`.
+        limit_expired_to_market:
+          type: boolean
+          nullable: true
+          description: Master `limit_expired_to_market`.
+        use_buy_order_book:
+          type: boolean
+          nullable: true
+          description: Master `use_buy_order_book`.
+        buy_bid_level:
+          type: string
+          nullable: true
+          description: Master `buy_bid_level`.
+        buy_ask_level:
+          type: string
+          nullable: true
+          description: Master `buy_ask_level`.
+        use_sell_order_book:
+          type: boolean
+          nullable: true
+          description: Master `use_sell_order_book`.
+        sell_bid_level:
+          type: string
+          nullable: true
+          description: Master `sell_bid_level`.
+        sell_ask_level:
+          type: string
+          nullable: true
+          description: Master `sell_ask_level`.
+        buy_order_book_mode:
+          type: string
+          nullable: true
+          description: Master `buy_order_book_mode`.
+        sell_order_book_mode:
+          type: string
+          nullable: true
+          description: Master `sell_order_book_mode`.
+        turbo_mode:
+          type: boolean
+          nullable: true
+          description: Master `turbo_mode`.
+        status:
+          "$ref": "#/components/schemas/CopytradeStatus"
+        created_at:
+          type: string
+          format: date-time
+          nullable: true
+          description: Derived from master `create_dt` when available.
+        updated_at:
+          type: string
+          format: date-time
+          nullable: true
+    CopytradeConfigList:
+      type: object
+      required:
+      - items
+      properties:
+        items:
+          type: array
+          items:
+            "$ref": "#/components/schemas/CopytradeConfig"
+        next_cursor:
+          type: string
+          nullable: true
+    CopytradeRecord:
+      type: object
+      additionalProperties: true
+      description: Master `CopyTradeRecord` object. The OpenAPI gateway forwards all
+        fields returned by master.
+      properties:
+        record_id:
+          type: string
+        config_id:
+          type: integer
+          format: uint64
+        order_id:
+          type: string
+          nullable: true
+        status:
+          type: integer
+          format: uint32
+          enum:
+          - 1
+          - 2
+          - 3
+          - 4
+          - 5
+          description: 'Record status: 1=success, 2=failed, 3=waiting, 4=cancel, 5=partially.
+            For failed records (`2`), read `error_msg` when returned by master.'
+        error_msg:
+          type: string
+          nullable: true
+          description: Failure reason when `status=2`, if returned by master.
+        market:
+          type: string
+        target_price:
+          type: string
+        target_amount:
+          type: string
+        target_amount_usd:
+          type: string
+        copy_price:
+          type: string
+        copy_amount:
+          type: string
+        copy_amount_usd:
+          type: string
+        side:
+          type: string
+        create_dt:
+          type: integer
+          format: uint64
+        created_at:
+          type: string
+          format: date-time
+          deprecated: true
+          description: Legacy mapped field. New responses forward master `create_dt`.
+    CopytradeRecordList:
+      type: object
+      required:
+      - items
+      properties:
+        items:
+          type: array
+          items:
+            "$ref": "#/components/schemas/CopytradeRecord"
+        next_cursor:
+          type: string
+          nullable: true

@@ -1,10 +1,10 @@
 ---
 title: "Poly Trader OpenAPI: Programmatic Trading for Partners"
 sidebarTitle: "Home"
-description: "Poly Trader OpenAPI gives partners programmatic access to trading, wallets, positions, copy-trading, and AFK strategies, all signed with HMAC-SHA256."
+description: "Poly Trader OpenAPI gives partners programmatic access to trading, wallets, positions, copytrade, and AFK strategies through API Key + HMAC-SHA256 authentication."
 ---
 
-Poly Trader OpenAPI gives external developers and partners programmatic access to the full Poly Trader trading platform. Every request is authenticated with an API key and HMAC-SHA256 signature, giving you secure, auditable access to wallets, orders, positions, copy-trading, and AFK automated strategies.
+Poly Trader OpenAPI gives external developers and partners programmatic access to third-party Poly Trader API workflows. Every documented endpoint uses API Key + HMAC-SHA256 authentication, giving you secure, auditable access to wallets, orders, positions, copytrade, and AFK automated strategies.
 
 <CardGroup cols={2}>
   <Card title="Introduction" icon="book-open" href="/overview/introduction">
@@ -16,8 +16,8 @@ Poly Trader OpenAPI gives external developers and partners programmatic access t
   <Card title="Authentication" icon="lock" href="/concepts/authentication">
     Learn the required headers, canonical string format, and timestamp rules.
   </Card>
-  <Card title="API Reference" icon="code" href="/api/partner/list-users">
-    Full reference for Partner, Wallet, Orders, Positions, Copytrade, and AFK endpoints.
+  <Card title="API Reference" icon="code" href="/api-reference">
+    Interactive reference generated from the third-party OpenAPI specification.
   </Card>
 </CardGroup>
 
@@ -25,7 +25,7 @@ Poly Trader OpenAPI gives external developers and partners programmatic access t
 
 <Steps>
   <Step title="Obtain an API key">
-    Contact your Poly Trader partner manager or generate an API key from your account. Store the key secret securely — it is shown only once.
+    Contact your Poly Trader partner manager or create a delegated user API key through the Partner API. Store the key secret securely because it is shown only once.
   </Step>
   <Step title="Build your HMAC-SHA256 signature">
     Construct the canonical string from method, path, query, timestamp, nonce, and body hash, then sign it with your secret key using HMAC-SHA256.
