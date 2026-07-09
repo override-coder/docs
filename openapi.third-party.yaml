@@ -33,6 +33,7 @@ x-doc-classification:
     - copytrade
     - afk
     - withdraw
+    - partner
 tags:
 - name: Wallet
   description: Custodial wallet balance and Polygon withdrawal APIs.
@@ -44,6 +45,8 @@ tags:
   description: Copytrade configuration, market filters, keywords, and execution records.
 - name: AFK
   description: AFK strategy configuration and execution records.
+- name: Partner
+  description: Partner-only APIs for provisioning partner users and creating user API keys.
 paths:
   "/wallet":
     get:
@@ -837,6 +840,123 @@ paths:
                       "$ref": "#/components/schemas/CopytradeRecordList"
         '400':
           "$ref": "#/components/responses/BadRequest"
+  "/partner/users":
+    get:
+      tags:
+      - Partner
+      summary: List partner users
+      operationId: listPartnerUsers
+      description: Requires a partner API key with `partner:users:manage` or `*` scope. Results are ordered by newest partner user first. Use the returned `next_cursor` as the next request's `cursor`.
+      security:
+      - ApiKeyAuth: []
+        ApiTimestamp: []
+        ApiNonce: []
+        ApiSignature: []
+      parameters:
+      - "$ref": "#/components/parameters/Limit"
+      - "$ref": "#/components/parameters/Cursor"
+      responses:
+        '200':
+          description: Partner user list
+          content:
+            application/json:
+              schema:
+                allOf:
+                - "$ref": "#/components/schemas/ApiResponse"
+                - type: object
+                  properties:
+                    data:
+                      "$ref": "#/components/schemas/PartnerUserListData"
+        '400':
+          "$ref": "#/components/responses/BadRequest"
+        '401':
+          "$ref": "#/components/responses/Unauthorized"
+        '403':
+          "$ref": "#/components/responses/Forbidden"
+    post:
+      tags:
+      - Partner
+      summary: Create or get a partner user
+      operationId: createPartnerUser
+      description: Requires a partner API key with `partner:users:manage` or `*` scope. If the user already exists for the same `external_user_id`, this endpoint returns that user and may retry wallet initialization when needed.
+      security:
+      - ApiKeyAuth: []
+        ApiTimestamp: []
+        ApiNonce: []
+        ApiSignature: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              "$ref": "#/components/schemas/PartnerUserCreateRequest"
+      responses:
+        '200':
+          description: Partner user created or returned
+          content:
+            application/json:
+              schema:
+                allOf:
+                - "$ref": "#/components/schemas/ApiResponse"
+                - type: object
+                  properties:
+                    data:
+                      "$ref": "#/components/schemas/PartnerUserData"
+        '400':
+          "$ref": "#/components/responses/BadRequest"
+        '401':
+          "$ref": "#/components/responses/Unauthorized"
+        '403':
+          "$ref": "#/components/responses/Forbidden"
+        '404':
+          "$ref": "#/components/responses/NotFound"
+  "/partner/users/{user_account_id}/api-keys":
+    post:
+      tags:
+      - Partner
+      summary: Create a user API key for a partner user
+      operationId: createPartnerUserApiKey
+      description: Requires a partner API key with `partner:api_keys:manage` or `*` scope. The partner user must have `wallet_status=ready`; if it is `pending` or `failed`, retry create-or-get for the same `external_user_id` before creating the user API key. The returned secret is shown only once.
+      parameters:
+      - "$ref": "#/components/parameters/IdempotencyKey"
+      - name: user_account_id
+        in: path
+        required: true
+        schema:
+          "$ref": "#/components/schemas/AccountId"
+      security:
+      - ApiKeyAuth: []
+        ApiTimestamp: []
+        ApiNonce: []
+        ApiSignature: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              "$ref": "#/components/schemas/PartnerUserApiKeyCreateRequest"
+      responses:
+        '200':
+          description: User API key created. Secret is shown only once.
+          content:
+            application/json:
+              schema:
+                allOf:
+                - "$ref": "#/components/schemas/ApiResponse"
+                - type: object
+                  properties:
+                    data:
+                      "$ref": "#/components/schemas/CreateApiKeyData"
+        '400':
+          "$ref": "#/components/responses/BadRequest"
+        '401':
+          "$ref": "#/components/responses/Unauthorized"
+        '403':
+          "$ref": "#/components/responses/Forbidden"
+        '404':
+          "$ref": "#/components/responses/NotFound"
+        '409':
+          "$ref": "#/components/responses/Conflict"
 components:
   securitySchemes:
     ApiKeyAuth:
@@ -1092,6 +1212,7 @@ components:
       - OK
       - BAD_REQUEST
       - UNAUTHORIZED
+      - FORBIDDEN
       - NOT_FOUND
       - VALIDATION_FAILED
       - CONFLICT
@@ -1127,10 +1248,169 @@ components:
       - COPYTRADE_CONFIG_INVALID
       - COPYTRADE_CREATE_FAILED
       - COPYTRADE_UPDATE_FAILED
+      - PARTNER_USER_WALLET_NOT_READY
     AccountId:
       type: string
       pattern: "^99[0-9]{20}$"
       example: '9912345678901234564821'
+    ApiKey:
+      type: object
+      required:
+      - key_id
+      - name
+      - status
+      - scopes
+      - ip_whitelist
+      - created_at
+      properties:
+        key_id:
+          type: string
+          example: pk_xxx
+        name:
+          type: string
+          example: user trading key
+        status:
+          type: string
+          enum:
+          - active
+          - revoked
+          - disabled
+        scopes:
+          type: array
+          items:
+            type: string
+          example:
+          - trade:order
+          - wallet:read
+        ip_whitelist:
+          type: array
+          items:
+            type: string
+          example: []
+        created_at:
+          type: string
+          format: date-time
+        last_used_at:
+          type: string
+          format: date-time
+          nullable: true
+    CreateApiKeyData:
+      allOf:
+      - "$ref": "#/components/schemas/ApiKey"
+      - type: object
+        required:
+        - secret
+        properties:
+          secret:
+            type: string
+            description: API key secret. Shown only once.
+            example: sk_xxx
+    PartnerUserCreateRequest:
+      type: object
+      required:
+      - external_user_id
+      properties:
+        external_user_id:
+          type: string
+          description: Partner-side stable user id.
+          maxLength: 128
+          example: user_123
+        display_name:
+          type: string
+          maxLength: 128
+          example: Alice
+        email:
+          type: string
+          format: email
+          maxLength: 255
+          example: alice@example.com
+    PartnerUserData:
+      type: object
+      required:
+      - partner_account_id
+      - user_account_id
+      - external_user_id
+      - status
+      - wallet_status
+      - created_at
+      - updated_at
+      properties:
+        partner_account_id:
+          "$ref": "#/components/schemas/AccountId"
+        user_account_id:
+          "$ref": "#/components/schemas/AccountId"
+        external_user_id:
+          type: string
+          example: user_123
+        display_name:
+          type: string
+        email:
+          type: string
+        status:
+          type: string
+          enum:
+          - active
+          - disabled
+        wallet_status:
+          type: string
+          description: Wallet initialization status for this partner user. `ready` means the user's custodial trading wallet has been initialized; `pending` or `failed` means the partner may retry create-or-get for the same `external_user_id` to initialize the wallet.
+          enum:
+          - pending
+          - ready
+          - failed
+        wallet_created:
+          type: boolean
+          nullable: true
+        wallet_initialized_at:
+          type: string
+          format: date-time
+          nullable: true
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+    PartnerUserListData:
+      type: object
+      required:
+      - items
+      properties:
+        items:
+          type: array
+          items:
+            "$ref": "#/components/schemas/PartnerUserData"
+        next_cursor:
+          type: string
+          nullable: true
+          description: Cursor for the next page. It is the last `user_account_id` from the current page; omit it when this field is absent.
+    PartnerUserApiKeyCreateRequest:
+      type: object
+      required:
+      - name
+      properties:
+        name:
+          type: string
+          example: user trading key
+        scopes:
+          type: array
+          description: |
+            Optional scopes for the generated user API key. If omitted, the key receives these default scopes:
+            `trade:read`, `trade:order`, `trade:cancel`, `wallet:read`, `positions:read`,
+            `copytrade:read`, `copytrade:manage`, `afk:read`, and `afk:manage`.
+
+            The wildcard scope `*` is not accepted for user API keys. User API key scopes must be one of:
+            `trade:read`, `trade:order`, `trade:cancel`, `wallet:read`, `positions:read`,
+            `copytrade:read`, `copytrade:manage`, `afk:read`, or `afk:manage`.
+
+            `withdraw:create` is not supported for partner user API keys in V1 because withdrawals
+            require account-level TOTP. To enable this permission later, first add a partner-user TOTP binding flow,
+            then add `withdraw:create` to the allowed partner user key scopes.
+          items:
+            type: string
+          example:
+          - trade:order
+          - wallet:read
     Wallet:
       type: object
       required:

@@ -15,6 +15,7 @@ These codes cover request-level problems that can occur on any endpoint.
 | `OK` | 200 | Request succeeded | No action |
 | `BAD_REQUEST` | 400 | The request is malformed or missing required fields | Fix the request before retrying |
 | `UNAUTHORIZED` | 401 | Authentication failed | Check your headers and signature |
+| `FORBIDDEN` | 403 | The API key is authenticated but not allowed to perform this operation | Check the API key type and scopes |
 | `NOT_FOUND` | 404 | The requested resource does not exist | Verify the resource ID |
 | `VALIDATION_FAILED` | 422 | The request body failed schema validation | Correct the invalid body fields and retry |
 | `CONFLICT` | 409 | Conflict, e.g. a duplicate idempotency key submitted with a different body | Check your request for duplicate keys |
@@ -116,6 +117,14 @@ These codes are returned by the `/copytrade` endpoints.
 | `COPYTRADE_CONFIG_INVALID` | 422 | One or more config parameters are invalid | Review the config fields in your request against the API reference |
 | `COPYTRADE_CREATE_FAILED` | 422 | Config creation failed | Retry with corrected parameters |
 | `COPYTRADE_UPDATE_FAILED` | 422 | Config update failed | Retry with corrected parameters |
+
+## Partner errors
+
+These codes are returned by partner-only user provisioning and user API key endpoints.
+
+| Code | HTTP | Meaning | Recommended action |
+|---|---|---|---|
+| `PARTNER_USER_WALLET_NOT_READY` | 409 | The partner user's custodial wallet is not initialized yet | Retry `POST /partner/users` with the same `external_user_id`, then create the user API key after `wallet_status` becomes `ready` |
 
 ## Rate limiting
 
