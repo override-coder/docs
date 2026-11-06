@@ -14,14 +14,14 @@ Global, source IP, endpoint, account, API key, and trading limits can all apply 
 
 Rate limits also apply to unauthenticated requests. A `429 RATE_LIMITED` response does not confirm that the credentials are valid.
 
-| Bucket | Limit | Applies to |
+| Limit scope | Limit | Applies to |
 |---|---:|---|
 | Global | 6,000 requests / minute | All OpenAPI traffic |
 | Global burst | 1,500 requests / 10 seconds | All OpenAPI traffic |
 | IP | 60 requests / minute | Source IP |
 | IP burst | 20 requests / 10 seconds | Source IP |
-| Endpoint | 120 requests / minute | HTTP method + matched route template |
-| Endpoint burst | 40 requests / 10 seconds | HTTP method + matched route template |
+| Endpoint | 120 requests / minute | HTTP method and endpoint; resource IDs share the same limit |
+| Endpoint burst | 40 requests / 10 seconds | HTTP method and endpoint; resource IDs share the same limit |
 | Account | 120 requests / minute | Authenticated account |
 | Account burst | 40 requests / 10 seconds | Authenticated account |
 | API key | 120 requests / minute | API key id |
@@ -64,7 +64,7 @@ These limits apply to each account at each endpoint, in addition to the shared l
 | `PATCH` | `/afk/strategies/{strategy_id}` | 120 / minute |
 | `GET` | `/afk/records` | 120 / minute |
 
-Partner management operations use the default per-account endpoint bucket (120 / minute). See [Trading integration](/concepts/api-parity) for endpoint details.
+Partner management operations use the default limit per account and endpoint (120 / minute). See [Trading integration](/concepts/api-parity) for endpoint details.
 
 ## Rate-limit response
 
@@ -73,11 +73,11 @@ When a request exceeds a limit, the API returns HTTP `429` with `code=RATE_LIMIT
 | Header | Description |
 |---|---|
 | `Retry-After` | Seconds to wait before retrying |
-| `X-RateLimit-Limit` | The limit for the bucket that rejected the request |
+| `X-RateLimit-Limit` | The request limit that was exceeded |
 | `X-RateLimit-Remaining` | Remaining requests in the current window, usually `0` |
-| `X-RateLimit-Reset` | Seconds until the current bucket resets |
+| `X-RateLimit-Reset` | Seconds until the current request limit resets |
 
-Use `Retry-After` when present. If it is absent, use exponential backoff with jitter; do not retry immediately. On every retry, read the current timestamp, generate a new nonce, and recompute the signature. For a repeated write, keep the original API key, idempotency key, and request body. See [Idempotency](/concepts/idempotency) for each operation’s deduplication scope.
+Use `Retry-After` when present. If it is absent, use exponential backoff with jitter; do not retry immediately. On every retry, read the current timestamp, generate a new nonce, and recompute the signature. For a repeated write, keep the original API key, `Idempotency-Key`, and request body. See [Idempotency](/concepts/idempotency) for each operation’s deduplication scope.
 
 ## Invalid signatures
 

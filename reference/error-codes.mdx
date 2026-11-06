@@ -6,9 +6,9 @@ description: "Error codes returned by the third-party PolyCop OpenAPI."
 
 API JSON error responses include a machine-readable `code`. Use it with the HTTP status when deciding whether to retry, fix the request, or contact support.
 
-## General errors
+## Common response codes
 
-Any endpoint can return these codes.
+Check the endpoint reference for operation-specific responses.
 
 | Code | HTTP | Meaning | Recommended action |
 |---|---|---|---|
@@ -20,8 +20,8 @@ Any endpoint can return these codes.
 | `VALIDATION_FAILED` | 400 / 422 | The request body failed schema validation | Correct the invalid body fields and retry |
 | `CONFLICT` | 409 | The request conflicts with a previous operation or the current state | Check the message and current state. Preserve the original request when its result is unknown; see [Idempotency](/concepts/idempotency) |
 | `RATE_LIMITED` | 429 | Too many requests | Honor `Retry-After` when present; otherwise use exponential backoff with jitter |
-| `INTERNAL_ERROR` | 500 | Unexpected server-side error | For reads, retry with backoff; for writes, keep the original idempotency key and confirm the outcome |
-| `MASTER_UNAVAILABLE` | 502 | The service is temporarily unavailable | For reads, retry with backoff; for writes, keep the original idempotency key and confirm the outcome |
+| `INTERNAL_ERROR` | 500 | Unexpected server-side error | For reads, retry with backoff; for writes, keep the original `Idempotency-Key` and confirm the outcome |
+| `MASTER_UNAVAILABLE` | 502 | The service is temporarily unavailable | For reads, retry with backoff; for writes, keep the original `Idempotency-Key` and confirm the outcome |
 
 ## Account errors
 
@@ -73,18 +73,18 @@ Use these codes to handle failures from `/orders` requests.
 | `ORDER_CANCEL_FAILED` | 502 | The cancel request failed | Verify the current status of the order before retrying |
 | `ORDER_NOT_FOUND` | 404 | The order does not exist or belongs to a different account | Verify your `order_id` value |
 | `ORDER_INSUFFICIENT_BALANCE` | 422 | Your wallet balance is too low to fill the order | Top up your wallet balance |
-| `ORDER_RESULT_UNKNOWN` | 502 / 503 | The operation's result cannot be confirmed | Keep the original key and request; confirm the outcome before submitting again |
+| `ORDER_RESULT_UNKNOWN` | 502 / 503 | The operation's result cannot be confirmed | Keep the original `Idempotency-Key` and request; confirm the outcome before submitting again |
 
 <Warning>
-  Keep the original idempotency key and any returned `business_request_id`. That reference is not an exchange order ID. Query `GET /orders/{order_id}` only if you have an actual order ID. Configuration and redemption actions can also return HTTP `503` with `ORDER_RESULT_UNKNOWN`; they may have no order ID or business reference. See [Idempotency](/concepts/idempotency).
+  Keep the original `Idempotency-Key` and any returned `business_request_id`. That reference is not an exchange order ID. Query `GET /orders/{order_id}` only if you have an actual order ID. Configuration and redemption actions can also return HTTP `503` with `ORDER_RESULT_UNKNOWN`; they may have no order ID or business reference. See [Idempotency](/concepts/idempotency).
 </Warning>
 
 ## Redemption and configuration conflicts
 
 | Code | HTTP | Meaning | Recommended action |
 |---|---|---|---|
-| `REDEEM_RESULT_UNKNOWN` | 409 | The redemption outcome is unknown | Refresh redeemable positions and confirm the outcome; do not switch keys to resubmit |
-| `CONFLICT` | 409 | The operation is processing, the body differs from the stored intent, or an auto-claim update is concurrent | Preserve the original intent; refresh state before deciding on a new operation |
+| `REDEEM_RESULT_UNKNOWN` | 409 | The redemption outcome is unknown | Refresh redeemable positions and confirm the outcome; do not change the `Idempotency-Key` or API credentials to resubmit |
+| `CONFLICT` | 409 | The operation is processing, the body differs from the original request, or an auto-claim update is concurrent | Preserve the original request; refresh state before deciding on a new operation |
 
 
 ## Withdrawal errors
@@ -98,7 +98,7 @@ Use these codes to check withdrawal parameters or investigate a failed request.
 | `WITHDRAW_TOKEN_UNSUPPORTED` | 422 | The token contract address is not supported | Use one of the four supported token contract addresses listed in the API reference |
 | `WITHDRAW_ADDRESS_INVALID` | 422 | The destination address is not a valid Polygon address | Verify the address format (EIP-55 checksummed or lowercase hex) |
 | `WITHDRAW_AMOUNT_INVALID` | 422 | The withdrawal amount is invalid or below the minimum | Check the decimal amount and the error message; contact PolyCop if the applicable minimum is unclear |
-| `WITHDRAW_CREATE_FAILED` | 500 | The API could not complete the withdrawal request | Preserve the original key and check recovery state before further action |
+| `WITHDRAW_CREATE_FAILED` | 500 | The API could not complete the withdrawal request | Preserve the original `Idempotency-Key` and check recovery state before further action |
 | `WITHDRAW_NOT_FOUND` | 404 | The withdrawal ID was not found | Verify your `withdraw_id` value |
 | `WITHDRAW_RESULT_UNKNOWN` | 502 / 503 | The withdrawal result cannot be confirmed | Query `GET /wallet/withdrawals/by-key` with the original `Idempotency-Key`; use the ID lookup if known |
 
@@ -130,14 +130,14 @@ Partner user creation and API key issuance can return the following code.
 
 ## Rate limiting
 
-When you exceed a rate limit, the server returns HTTP `429` with the code `RATE_LIMITED`. Bucket-based rejections include headers that tell you when to retry. Signature-failure throttling can return the same code without these headers. A `429` can occur before credential validation and does not confirm that the credentials are valid. See [Rate limits](/concepts/rate-limits) for the per-endpoint limits.
+When you exceed a rate limit, the server returns HTTP `429` with the code `RATE_LIMITED`. Request-limit responses include headers that tell you when to retry. Signature-failure throttling can return the same code without these headers. A `429` can occur before credential validation and does not confirm that the credentials are valid. See [Rate limits](/concepts/rate-limits) for the per-endpoint limits.
 
 | Header | Description |
 |---|---|
 | `Retry-After` | Number of seconds you must wait before sending another request |
-| `X-RateLimit-Limit` | The effective request limit for the rate-limited bucket |
+| `X-RateLimit-Limit` | The request limit that was exceeded |
 | `X-RateLimit-Remaining` | Remaining requests in the current window (typically `0` on a 429 response) |
-| `X-RateLimit-Reset` | Seconds until the current rate-limit bucket resets |
+| `X-RateLimit-Reset` | Seconds until the current request limit resets |
 
 <Note>
   The withdrawal creation endpoint (`POST /wallet/withdraw`) has a dedicated rate
@@ -149,5 +149,5 @@ When you exceed a rate limit, the server returns HTTP `429` with the code `RATE_
 <Tip>
   When you receive `429`, pause requests that share the affected limit. Honor `Retry-After` when present; otherwise
   use exponential backoff with jitter. Regenerate signing headers on each retry.
-  Preserve the original API key, idempotency key, and intent for a repeated write.
+  Preserve the original API key, `Idempotency-Key`, and request body for a repeated write.
 </Tip>

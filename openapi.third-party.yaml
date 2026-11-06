@@ -319,7 +319,7 @@ paths:
         Required scope: `withdraw:create`.
 
         Creates a Polygon withdrawal for an eligible account. Telegram accounts and Partner user keys receive 403 FORBIDDEN. Status queries remain available.
-        Requires 2FA and Idempotency-Key. Keep the original key and exact body, including 2fa, on retries; refresh the HMAC signing headers. A different body with the same key returns CONFLICT. Idempotency covers the account across credentials and withdrawal routes; records do not expire automatically. Recover a lost response with GET /wallet/withdrawals/by-key.
+        Requires 2FA and Idempotency-Key. Keep the original Idempotency-Key and exact body, including 2fa, on retries; refresh the HMAC signing headers. A different body with the same Idempotency-Key returns CONFLICT. Idempotency covers the account across credentials and withdrawal routes; records do not expire automatically. Recover a lost response with GET /wallet/withdrawals/by-key.
         Limit: 5 requests per minute per account. Only one withdrawal may be processing, submitting, or submitted at a time. A new withdrawal requires the previous one to be succeeded or failed.
         Submission and on-chain confirmation are separate. Success returns submitted, or succeeded if already confirmed. An uncertain submission can return HTTP 200 with withdraw_id and status=submitting. This does not confirm acceptance or on-chain success. Poll the withdrawal status and confirm the outcome before starting another withdrawal. An unresolved submitting withdrawal continues to block new withdrawals. The API does not automatically resubmit it.
       security:
@@ -365,7 +365,7 @@ paths:
           "$ref": "#/components/responses/DependencyUnavailable"
         '503':
           description: The withdrawal result is unavailable. Recover it using the
-            original idempotency key; do not start another withdrawal.
+            original Idempotency-Key; do not start another withdrawal.
           content:
             application/json:
               schema:
@@ -379,10 +379,8 @@ paths:
       description: |-
         Required scope: `wallet:read`.
 
-        All recovery responses use Cache-Control: no-store; the key is a request header, not a cache selector.
-        Read-only recovery scoped to the authenticated account; API keys require wallet:read.
-        Returns the current withdrawal status without OTP or resubmission. Historical records have no key association and may return 404. A 404 is not
-        proof that an earlier request was not executed: do not automatically use a new key.
+        Returns the current withdrawal status for the authenticated account using the original Idempotency-Key. This query does not submit a withdrawal or require a 2FA code. All responses use Cache-Control: no-store.
+        Older withdrawals may not be found by Idempotency-Key. A 404 does not prove that a previous request was not executed; confirm its outcome before starting another withdrawal. See [withdrawal recovery](/concepts/idempotency#recover-a-withdrawal).
       operationId: getWithdrawalByKey
       security:
       - ApiKeyAuth: []
@@ -419,7 +417,7 @@ paths:
         '500':
           "$ref": "#/components/responses/InternalServerError"
         '503':
-          description: Recovery service unavailable; do not create another intent.
+          description: Recovery service unavailable; do not start another withdrawal.
         '409':
           "$ref": "#/components/responses/Conflict"
         '502':
@@ -507,25 +505,25 @@ paths:
         '422':
           "$ref": "#/components/responses/ValidationFailed"
         '409':
-          description: Key reused with different parameters, or the original request
-            is still processing. Keep the original intent and reconcile; do not create
-            another key.
+          description: Idempotency-Key reused with different parameters, or the original
+            request is still processing. Keep the original request and reconcile;
+            do not generate a new Idempotency-Key.
           content:
             application/json:
               schema:
                 "$ref": "#/components/schemas/ErrorResponse"
         '502':
           description: Order service failure or unknown order result. Retain the original
-            key and business_request_id; a same-account, same-key retry never automatically
-            resubmits an unknown result.
+            Idempotency-Key and business_request_id; a retry with the same account
+            and Idempotency-Key never automatically resubmits an unknown result.
           content:
             application/json:
               schema:
                 "$ref": "#/components/schemas/ErrorResponse"
         '503':
           description: The order result is unavailable. If ORDER_RESULT_UNKNOWN is
-            returned, keep the original key and request and confirm the outcome. Do
-            not submit under a new key.
+            returned, keep the original Idempotency-Key and request and confirm the
+            outcome. Do not submit under a new Idempotency-Key.
           content:
             application/json:
               schema:
@@ -541,7 +539,7 @@ paths:
       description: |-
         Required scope: `trade:order`.
 
-        Places an order for the authenticated account. Requires Idempotency-Key. Keep the original key and request when retrying; order idempotency applies across credentials for the same account.
+        Places an order for the authenticated account. Requires Idempotency-Key. Keep the original Idempotency-Key and request when retrying; order idempotency applies across credentials for the same account.
     get:
       x-required-scope: trade:read
       tags:
@@ -1004,7 +1002,7 @@ paths:
       description: |-
         Required scope: `copytrade:manage`.
 
-        Adds one keyword to a configuration whitelist or blacklist. Use this endpoint for keyword changes instead of PATCH /copytrade/configs/{config_id}. The configuration must belong to the authenticated account. Only config_type=1 is supported.
+        Adds one keyword to a configuration whitelist or blacklist. Use this endpoint for keyword changes instead of PATCH /copytrade/configs/{config_id}. The configuration must belong to the authenticated account. Only config_type=1 is supported. The public API does not provide a keyword-list endpoint, and configuration responses do not include keyword IDs. Adding a keyword returns an advisory code, not its ID. Deletion requires an already-known key_word_id.
       operationId: createCopytradeConfigKeyword
       parameters:
       - "$ref": "#/components/parameters/RequiredActionIdempotencyKey"
@@ -1065,7 +1063,7 @@ paths:
       description: |-
         Required scope: `copytrade:manage`.
 
-        Deletes the keyword identified by key_word_id. Both the path configuration and the target keyword must belong to the authenticated account. Use the configuration containing that keyword in the path.
+        Deletes the keyword identified by key_word_id. Both the path configuration and the target keyword must belong to the authenticated account. Use the configuration containing that keyword in the path. The public API does not provide a keyword-list endpoint, and configuration responses do not include keyword IDs. Adding a keyword returns an advisory code, not its ID. Deletion requires an already-known key_word_id.
       operationId: deleteCopytradeConfigKeyword
       parameters:
       - "$ref": "#/components/parameters/RequiredActionIdempotencyKey"
@@ -1318,7 +1316,9 @@ paths:
       description: |-
         Required scope: `afk:manage`.
 
-        Updates an AFK automatic trading strategy. For time_start_sec and time_end_sec on PATCH, omission or `0` keeps the existing value; `-1` resets it to `0`. A reset start permits entry from the beginning of each round; a reset end uses the end of the round.
+        Updates an AFK strategy. For limit_order_copy, use_kdj, use_macd, and use_atr, `1` toggles the current setting; `0` or omission leaves it unchanged. Each new update operation with `1` toggles the setting again. Retry the same operation with the original Idempotency-Key and body.
+        For time_start_sec and time_end_sec, omission or `0` keeps the current value; `-1` resets it to `0`. A reset start permits entry from the beginning of each round; a reset end uses the end of the round.
+        A successful response acknowledges the update. Its data is not a snapshot of the final configuration. Call GET /afk/strategies/{strategy_id} after updating to read the resulting settings.
       operationId: updateAFKStrategy
       parameters:
       - "$ref": "#/components/parameters/RequiredActionIdempotencyKey"
@@ -1336,7 +1336,8 @@ paths:
               "$ref": "#/components/schemas/AFKStrategyUpdateInput"
       responses:
         '200':
-          description: AFK strategy updated
+          description: Update acknowledged. Read GET /afk/strategies/{strategy_id}
+            for the resulting configuration; this response is not a final-state snapshot.
           content:
             application/json:
               schema:
@@ -1744,7 +1745,7 @@ paths:
       description: |-
         Required scope: `positions:redeem`.
 
-        Requests redemption for the authenticated user's default wallet and condition. Requires Idempotency-Key. A completed response for the same credential, key, and request is replayed for 24 hours. If the result is uncertain, the API returns 409 REDEEM_RESULT_UNKNOWN; retries with that key return the saved result without resubmitting. Refresh redeemable positions and confirm the outcome before further action. Deduplication is not guaranteed across different keys or credentials, expired records, interrupted requests, or other redemption entry points. Success acknowledges submission but includes no transaction ID or on-chain confirmation.
+        Requests redemption for the authenticated user's default wallet and condition. Requires Idempotency-Key. A completed response for the same API key, Idempotency-Key, and request is replayed for 24 hours. If the result is uncertain, the API returns 409 REDEEM_RESULT_UNKNOWN; retries with that Idempotency-Key return the saved result without resubmitting. Refresh redeemable positions and confirm the outcome before further action. Deduplication is not guaranteed across different Idempotency-Key values or API credentials, expired records, interrupted requests, or other redemption entry points. Success acknowledges submission but includes no transaction ID or on-chain confirmation.
       operationId: redeemPosition
       security:
       - ApiKeyAuth: []
@@ -1918,7 +1919,7 @@ components:
       description: |
         HMAC-SHA256 signature.
 
-        Malformed query encoding and repeated scalar query parameters return 400 BAD_REQUEST. Parameter names are URL-decoded before this check; duplicate values are rejected even when identical. Repeated keys are supported only for GET /positions (market), GET /closed-positions (market, eventId), and GET /activity (market, eventId, type). CSV array values remain supported. The canonical query sorting algorithm is unchanged.
+        Malformed query encoding and repeated scalar query parameters return 400 BAD_REQUEST. Parameter names are URL-decoded before this check; duplicate values are rejected even when identical. Repeated keys are supported only for GET /positions (market), GET /closed-positions (market, eventId), and GET /activity (market, eventId, type). These array parameters also accept comma-separated values.
 
         Canonical string:
         `METHOD + "\n" + PATH + "\n" + QUERY + "\n" + TIMESTAMP + "\n" + NONCE + "\n" + BODY_SHA256`.
@@ -1944,17 +1945,13 @@ components:
       name: Idempotency-Key
       in: header
       required: false
-      description: Optional idempotency key. V1 does not reject requests that omit
-        it. Reuse a key only for the same method, path, query, and body after a timeout,
-        network failure, or unknown result. Completed responses other than orders
-        and withdrawals are available for replay for 24 hours; processing, unknown
-        and legacy failed records are retained and never automatically re-executed.
-        Order and withdrawal records are retained without automatic expiry. Only failures
-        explicitly confirmed to have occurred before execution are eligible for retry;
-        use a new key after correcting business query/body input that received a definite
-        4xx response. Authentication must succeed for a response to be replayed. For
-        API key HMAC requests, retry the same business key with a fresh timestamp
-        and nonce and a newly calculated signature.
+      description: Optional for this endpoint. Use the same Idempotency-Key, API key,
+        method, path, query, and body when retrying the same operation. Completed
+        responses are normally available for replay for 24 hours; processing or blocked
+        requests do not execute again on retry. Current authentication and permissions
+        are required. Refresh HMAC signing headers on each retry. After a definite
+        pre-execution validation failure, use a new Idempotency-Key for corrected
+        input. See [Idempotency](/concepts/idempotency).
       schema:
         type: string
         maxLength: 128
@@ -1978,15 +1975,16 @@ components:
       name: Idempotency-Key
       in: header
       required: true
-      description: One account, the withdrawal operation, and this key identify one
-        withdrawal across sessions, keys, and routes. Keep the original key and exact
-        body (including 2fa) on retry. Changed body returns 409. Records do not expire
-        automatically. Current authentication and withdraw:create permission are required
-        before replay; refresh HMAC signing headers. After a timeout, query withdrawals/by-key
-        with the original key, without OTP. A different key is a new withdrawal intent.
-        Confirm the previous outcome before creating one. An old record may lack a
-        key association; recovery 404 does not prove non-execution. Ambiguous matching
-        records return 409 and require support reconciliation.
+      description: One account, the withdrawal operation, and this Idempotency-Key
+        identify one withdrawal across API keys and withdrawal routes for the same
+        account. Keep the original Idempotency-Key and exact body (including 2fa)
+        on retry. Changed body returns 409. Records do not expire automatically. Current
+        authentication and withdraw:create permission are required before replay;
+        refresh HMAC signing headers. After a timeout, query withdrawals/by-key with
+        the original Idempotency-Key, without OTP. A different Idempotency-Key is
+        a new withdrawal request. Confirm the previous outcome before creating one.
+        An old record may lack a key association; recovery 404 does not prove non-execution.
+        Ambiguous matching records return 409 and require support reconciliation.
       schema:
         type: string
         maxLength: 128
@@ -1994,9 +1992,10 @@ components:
       name: Idempotency-Key
       in: header
       required: true
-      description: Original withdrawal intent key. Querying never executes a withdrawal
+      description: Original withdrawal request key. Querying never executes a withdrawal
         or consumes OTP. A 404 is not proof that an earlier request was not executed,
-        including historical unmapped records; never generate a new key automatically.
+        including historical unmapped records; never generate a new Idempotency-Key
+        automatically.
       schema:
         type: string
         minLength: 1
@@ -2012,20 +2011,21 @@ components:
       name: Idempotency-Key
       in: header
       required: true
-      description: One account, order creation, and this key identify one order across
-        sessions, API keys, and order routes. Keep the key, query parameters, and
-        exact body on retry; changed parameters return 409 CONFLICT. Current authentication
-        and trade:order permission are required before replay. Refresh HMAC signing
-        headers. An unknown result returns its saved response or a processing conflict
-        on retry, without resubmission. Processing, unknown, failed, and completed
-        order records do not expire automatically. After a definite validation failure,
-        use a new key for corrected parameters. An identical request with a different
-        key creates a distinct order intent; another account has a separate scope.
-        Keep the original key and business_request_id and any order_id to confirm
-        the outcome before creating another order. business_request_id is a support
-        reference, not an exchange order ID. Ambiguous historical matches return 409
-        CONFLICT and require support reconciliation. Do not assume deduplication across
-        other trading entry points.
+      description: One account, order creation, and this Idempotency-Key identify
+        one order across API keys and order routes for the same account. Keep the
+        Idempotency-Key, query parameters, and exact body on retry; changed parameters
+        return 409 CONFLICT. Current authentication and trade:order permission are
+        required before replay. Refresh HMAC signing headers. An unknown result returns
+        its saved response or a processing conflict on retry, without resubmission.
+        Processing, unknown, failed, and completed order records do not expire automatically.
+        After a definite validation failure, use a new Idempotency-Key for corrected
+        parameters. An identical request with a different Idempotency-Key creates
+        a distinct order request; another account has a separate scope. Keep the original
+        Idempotency-Key and business_request_id and any order_id to confirm the outcome
+        before creating another order. business_request_id is a support reference,
+        not an exchange order ID. Ambiguous historical matches return 409 CONFLICT
+        and require support reconciliation. Do not assume deduplication across other
+        trading entry points.
       schema:
         type: string
         maxLength: 128
@@ -2084,15 +2084,15 @@ components:
       in: header
       required: true
       description: Required for writes including automation configuration and redemption.
-        Retry scope is account, credential, HTTP method, path, and key; requests using
-        different credentials are separate. Refresh HMAC signing headers. Current
-        scopes are required before replay. Use the same key and exact request body;
-        a changed body returns CONFLICT. Deterministic responses below HTTP 500 are
-        cached for 24 hours. An uncertain redemption returns REDEEM_RESULT_UNKNOWN
+        Retry scope is account, credential, HTTP method, path, and Idempotency-Key;
+        requests using different credentials are separate. Refresh HMAC signing headers.
+        Current scopes are required before replay. Use the same Idempotency-Key and
+        exact request body; a changed body returns CONFLICT. Deterministic responses
+        below HTTP 500 are cached for 24 hours. An uncertain redemption returns REDEEM_RESULT_UNKNOWN
         and is not resubmitted on retry. Refresh redeemable positions and confirm
-        the outcome instead of switching keys. After a definite validation failure,
-        or a concurrent auto-claim conflict followed by a refreshed setting, use a
-        new key for the new operation.
+        the outcome instead of changing the Idempotency-Key or API credentials. After
+        a definite validation failure, or a concurrent auto-claim conflict followed
+        by a refreshed setting, use a new Idempotency-Key for the new operation.
       schema:
         type: string
         maxLength: 128
@@ -2107,8 +2107,9 @@ components:
       name: key_word_id
       in: path
       required: true
-      description: Keyword record id returned in keyword query results. Used only
-        to delete the keyword binding.
+      description: ID of an existing keyword binding to delete. The public API does
+        not provide a keyword-list endpoint or return keyword IDs when adding keywords;
+        this operation requires an already-known ID.
       schema:
         type: integer
         minimum: 1
@@ -2207,8 +2208,8 @@ components:
           description: Stable order support reference for the same account, create-order
             operation and Idempotency-Key across credentials and clients. Legacy records
             retain their original reference. Also returned in X-Business-Request-ID.
-            Use it with the original key for support reconciliation, not as an exchange
-            order ID.
+            Use it with the original Idempotency-Key for support reconciliation, not
+            as an exchange order ID.
           example: ord_39dad9393e068dced11e313210e79e69f7a5a2355bdcf9390f89b22daa659d8b
     PartnerUserListData:
       type: object
@@ -2450,10 +2451,11 @@ components:
     APIKeyIPWhitelist:
       type: array
       maxItems: 64
-      description: IPv4/IPv6 addresses or CIDRs. Global /0 ranges are rejected. Required
-        for write scopes. Empty permits unrestricted reads only; all HMAC writes require
-        a bound source IP. Forwarded IPs are accepted only from configured trusted
-        proxies.
+      description: IPv4/IPv6 addresses or CIDRs. Global /0 ranges are rejected. A
+        nonempty whitelist is required for write scopes and all HMAC write requests.
+        An empty whitelist imposes no source-IP restriction on reads; authentication,
+        permissions, and rate limits still apply. A configured whitelist restricts
+        both reads and writes.
       items:
         type: string
       example:
@@ -2542,7 +2544,8 @@ components:
         account_value:
           type: string
           nullable: true
-          description: Account balance.
+          description: Account value, including available trading balance and position
+            value. This is not a withdrawable-cash amount.
         available_trade:
           type: string
           nullable: true
@@ -2751,9 +2754,10 @@ components:
             "$ref": "#/components/schemas/Order"
     Order:
       type: object
-      description: 'Complete public mapping of `Order`. Compatibility aliases are
-        retained: `order_id=id`, `asset=asset_id`, and `size=original_size`. `status`
-        is the API status while `master_status` preserves the original value.'
+      description: Order details. Equivalent response fields are order_id and id,
+        asset and asset_id, and size and original_size. The status field contains
+        the API order status; master_status contains the original status value when
+        available.
       required:
       - associate_trades
       - id
@@ -3018,7 +3022,10 @@ components:
       - config_id
       - target_address
       - status
-      description: Copytrade configuration and its current settings.
+      description: |-
+        Copytrade configuration and its current settings.
+
+        For 5/15-minute market windows, copying is allowed in either configured start or end window when both are positive. If neither window is positive, no time-window restriction applies. Turbo mode bypasses these window checks.
       properties:
         telegram_id:
           type: string
@@ -3175,31 +3182,27 @@ components:
         max_5m_market_start_time:
           type: string
           nullable: true
-          description: Copy buys in 5-minute Up/Down markets within this many seconds
-            after the market opens. Positive integer string. If both start and end
-            windows are positive, either window permits copying. If neither is positive,
-            no time-window restriction applies. Turbo mode bypasses this check.
+          description: Number of seconds after the market opens during which buys
+            may be copied in 5-minute Up/Down markets. Positive integer string. See
+            the market-window combination rule in this schema.
         max_5m_market_end_time:
           type: string
           nullable: true
-          description: Copy buys in 5-minute Up/Down markets within this many seconds
-            before the market closes. Positive integer string. If both start and end
-            windows are positive, either window permits copying. If neither is positive,
-            no time-window restriction applies. Turbo mode bypasses this check.
+          description: Number of seconds before the market closes during which buys
+            may be copied in 5-minute Up/Down markets. Positive integer string. See
+            the market-window combination rule in this schema.
         max_15m_market_start_time:
           type: string
           nullable: true
-          description: Copy buys in 15-minute Up/Down markets within this many seconds
-            after the market opens. Positive integer string. If both start and end
-            windows are positive, either window permits copying. If neither is positive,
-            no time-window restriction applies. Turbo mode bypasses this check.
+          description: Number of seconds after the market opens during which buys
+            may be copied in 15-minute Up/Down markets. Positive integer string. See
+            the market-window combination rule in this schema.
         max_15m_market_end_time:
           type: string
           nullable: true
-          description: Copy buys in 15-minute Up/Down markets within this many seconds
-            before the market closes. Positive integer string. If both start and end
-            windows are positive, either window permits copying. If neither is positive,
-            no time-window restriction applies. Turbo mode bypasses this check.
+          description: Number of seconds before the market closes during which buys
+            may be copied in 15-minute Up/Down markets. Positive integer string. See
+            the market-window combination rule in this schema.
         tp_balance_threshold:
           type: string
           nullable: true
@@ -3447,28 +3450,24 @@ components:
             remains good until cancelled.
         max_5m_market_start_time:
           type: string
-          description: Copy buys in 5-minute Up/Down markets within this many seconds
-            after the market opens. Positive integer string. If both start and end
-            windows are positive, either window permits copying. If neither is positive,
-            no time-window restriction applies. Turbo mode bypasses this check.
+          description: Number of seconds after the market opens during which buys
+            may be copied in 5-minute Up/Down markets. Positive integer string. See
+            the market-window combination rule in this schema.
         max_5m_market_end_time:
           type: string
-          description: Copy buys in 5-minute Up/Down markets within this many seconds
-            before the market closes. Positive integer string. If both start and end
-            windows are positive, either window permits copying. If neither is positive,
-            no time-window restriction applies. Turbo mode bypasses this check.
+          description: Number of seconds before the market closes during which buys
+            may be copied in 5-minute Up/Down markets. Positive integer string. See
+            the market-window combination rule in this schema.
         max_15m_market_start_time:
           type: string
-          description: Copy buys in 15-minute Up/Down markets within this many seconds
-            after the market opens. Positive integer string. If both start and end
-            windows are positive, either window permits copying. If neither is positive,
-            no time-window restriction applies. Turbo mode bypasses this check.
+          description: Number of seconds after the market opens during which buys
+            may be copied in 15-minute Up/Down markets. Positive integer string. See
+            the market-window combination rule in this schema.
         max_15m_market_end_time:
           type: string
-          description: Copy buys in 15-minute Up/Down markets within this many seconds
-            before the market closes. Positive integer string. If both start and end
-            windows are positive, either window permits copying. If neither is positive,
-            no time-window restriction applies. Turbo mode bypasses this check.
+          description: Number of seconds before the market closes during which buys
+            may be copied in 15-minute Up/Down markets. Positive integer string. See
+            the market-window combination rule in this schema.
         tp_balance_threshold:
           type: string
           description: Account-value threshold for pausing this configuration when
@@ -3554,6 +3553,9 @@ components:
             checks.
         status:
           "$ref": "#/components/schemas/CopytradeStatus"
+      description: For 5/15-minute market windows, copying is allowed in either configured
+        start or end window when both are positive. If neither window is positive,
+        no time-window restriction applies. Turbo mode bypasses these window checks.
     CopytradeMarketTypesInput:
       type: object
       required:
@@ -3780,28 +3782,24 @@ components:
             expiration.
         max_5m_market_start_time:
           type: string
-          description: Copy buys in 5-minute Up/Down markets within this many seconds
-            after the market opens. Positive integer string. If both start and end
-            windows are positive, either window permits copying. If neither is positive,
-            no time-window restriction applies. Turbo mode bypasses this check.
+          description: Number of seconds after the market opens during which buys
+            may be copied in 5-minute Up/Down markets. Positive integer string. See
+            the market-window combination rule in this schema.
         max_5m_market_end_time:
           type: string
-          description: Copy buys in 5-minute Up/Down markets within this many seconds
-            before the market closes. Positive integer string. If both start and end
-            windows are positive, either window permits copying. If neither is positive,
-            no time-window restriction applies. Turbo mode bypasses this check.
+          description: Number of seconds before the market closes during which buys
+            may be copied in 5-minute Up/Down markets. Positive integer string. See
+            the market-window combination rule in this schema.
         max_15m_market_start_time:
           type: string
-          description: Copy buys in 15-minute Up/Down markets within this many seconds
-            after the market opens. Positive integer string. If both start and end
-            windows are positive, either window permits copying. If neither is positive,
-            no time-window restriction applies. Turbo mode bypasses this check.
+          description: Number of seconds after the market opens during which buys
+            may be copied in 15-minute Up/Down markets. Positive integer string. See
+            the market-window combination rule in this schema.
         max_15m_market_end_time:
           type: string
-          description: Copy buys in 15-minute Up/Down markets within this many seconds
-            before the market closes. Positive integer string. If both start and end
-            windows are positive, either window permits copying. If neither is positive,
-            no time-window restriction applies. Turbo mode bypasses this check.
+          description: Number of seconds before the market closes during which buys
+            may be copied in 15-minute Up/Down markets. Positive integer string. See
+            the market-window combination rule in this schema.
         tp_balance_threshold:
           type: string
           description: Account-value threshold for pausing this configuration when
@@ -3880,6 +3878,9 @@ components:
             checks. On PATCH, specify the desired final state.
         status:
           "$ref": "#/components/schemas/CopytradeStatus"
+      description: For 5/15-minute market windows, copying is allowed in either configured
+        start or end window when both are positive. If neither window is positive,
+        no time-window restriction applies. Turbo mode bypasses these window checks.
     CopytradeKeywordInput:
       type: object
       required:
@@ -3956,6 +3957,9 @@ components:
             format: date-time
             nullable: true
             description: Strategy create time derived from `create_dt`.
+      description: AFK strategy values in GET responses. The PATCH success response
+        uses this shape as an acknowledgement; query the strategy to read its final
+        configuration.
     AFKStrategyInput:
       type: object
       required:
@@ -3968,7 +3972,10 @@ components:
           description: User-visible strategy label.
         market:
           type: string
-          description: Market identifier or market group configured for the AFK strategy.
+          description: Market code for an AFK symbol and duration. For example, BTC5
+            selects 5 minutes and BTC selects 15 minutes. Use a market code rather
+            than a condition ID or market slug. See [AFK market codes](/concepts/api-parity#afk-market-codes)
+            for the supported families and durations.
         period:
           type: integer
           description: Configured period in seconds. The trading round duration is
@@ -4036,7 +4043,9 @@ components:
           enum:
           - 0
           - 1
-          description: Order mode; `0` means market order, `1` means limit order.
+          description: For creation and GET responses, `0` means market order and
+            `1` means limit order. On PATCH, `1` toggles the current setting; `0`
+            or omission leaves it unchanged.
         slippage:
           type: string
           description: Market order slippage percentage string, for example `2` means
@@ -4046,19 +4055,25 @@ components:
           enum:
           - 0
           - 1
-          description: KDJ indicator filter switch; `0` disabled, `1` enabled.
+          description: KDJ filter. For creation and GET responses, `0` means disabled
+            and `1` means enabled. On PATCH, `1` toggles the current setting; `0`
+            or omission leaves it unchanged.
         use_macd:
           type: integer
           enum:
           - 0
           - 1
-          description: MACD indicator filter switch; `0` disabled, `1` enabled.
+          description: MACD filter. For creation and GET responses, `0` means disabled
+            and `1` means enabled. On PATCH, `1` toggles the current setting; `0`
+            or omission leaves it unchanged.
         use_atr:
           type: integer
           enum:
           - 0
           - 1
-          description: ATR indicator filter switch; `0` disabled, `1` enabled.
+          description: ATR filter. For creation and GET responses, `0` means disabled
+            and `1` means enabled. On PATCH, `1` toggles the current setting; `0`
+            or omission leaves it unchanged.
     AFKStatus:
       type: string
       enum:
@@ -4084,9 +4099,9 @@ components:
         properties:
           status:
             "$ref": "#/components/schemas/AFKStatus"
-      description: For time_start_sec and time_end_sec on PATCH, omission or `0` keeps
-        the existing value; `-1` resets it to `0`. A reset start permits entry from
-        the beginning of each round; a reset end uses the end of the round.
+      description: |-
+        For time_start_sec and time_end_sec on PATCH, omission or `0` keeps the existing value; `-1` resets it to `0`. A reset start permits entry from the beginning of each round; a reset end uses the end of the round.
+        For limit_order_copy, use_kdj, use_macd, and use_atr, `1` toggles the current setting; `0` or omission leaves it unchanged. These inputs are commands, not desired final values. Retry the same operation with its original Idempotency-Key and body. See [AFK updates](/concepts/api-parity#afk-updates).
     AFKRecordList:
       type: object
       required:
@@ -4543,23 +4558,25 @@ components:
       description: Rate limited
       headers:
         Retry-After:
-          description: Seconds to wait before retrying the same rate-limited bucket.
+          description: Seconds to wait before retrying requests subject to the exceeded
+            limit.
           schema:
             type: integer
             minimum: 1
         X-RateLimit-Limit:
-          description: Effective limit for the bucket that rejected the request.
+          description: The request limit that was exceeded.
           schema:
             type: integer
             minimum: 1
         X-RateLimit-Remaining:
-          description: Remaining tokens in the bucket that rejected the request. Usually
-            0 on 429.
+          description: Remaining requests under the exceeded limit, usually 0 in a
+            429 response.
           schema:
             type: integer
             minimum: 0
         X-RateLimit-Reset:
-          description: Seconds until the bucket is expected to accept another request.
+          description: Seconds until the request limit is expected to allow another
+            request.
           schema:
             type: integer
             minimum: 1
@@ -4587,10 +4604,10 @@ components:
             "$ref": "#/components/schemas/ErrorResponse"
     ActionResultUnavailable:
       description: The API cannot confirm the operation's result. A 503 does not prove
-        non-execution. Preserve the original key and request, confirm the outcome,
-        and never automatically submit under a new key. Configuration and redemption
-        operations can also return ORDER_RESULT_UNKNOWN; do not assume an exchange
-        order ID or business_request_id exists for those operations.
+        non-execution. Preserve the original Idempotency-Key and request, confirm
+        the outcome, and never automatically submit under a new Idempotency-Key. Configuration
+        and redemption operations can also return ORDER_RESULT_UNKNOWN; do not assume
+        an exchange order ID or business_request_id exists for those operations.
       content:
         application/json:
           schema:

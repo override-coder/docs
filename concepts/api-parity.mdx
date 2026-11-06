@@ -33,7 +33,7 @@ Use the user’s API key with `copytrade:manage` for these operations. They retu
 | Delete a copytrade keyword | `{}` |
 | Update copytrade market types | `{}` |
 
-The keyword's `data.code` is an advisory value, separate from the outer `code=OK`. Adding a keyword does not return a keyword ID. Use only the response fields documented here.
+The keyword's `data.code` is an advisory value, separate from the outer `code=OK`. Adding a keyword does not return a keyword ID. The public API has no keyword-list endpoint, and configuration responses do not include keyword IDs. Deletion requires an already-known `key_word_id`; these endpoints do not provide a complete flow for obtaining it.
 
 Partner user keys cannot withdraw. See [Partner API](/concepts/partner-api) for account provisioning and supported actions.
 
@@ -41,12 +41,38 @@ Partner user keys cannot withdraw. See [Partner API](/concepts/partner-api) for 
 
 Use the user's API key when adding or deleting keywords or updating market types. These operations use the documented `/copytrade/configs/{config_id}` routes and payloads. The user's API key determines the account. A Partner Key cannot select another trading user.
 
+## AFK market codes
+
+Use a market code in `market`, rather than a condition ID or market slug. The code selects the market duration; changing `period` alone does not change it.
+
+The supported symbol families are `BTC`, `ETH`, `SOL`, `XRP`, `DOGE`, `BNB`, and `HYPE`.
+
+| Code format | Duration | BTC example |
+|---|---|---|
+| Symbol followed by `5` | 5 minutes (300 seconds) | `BTC5` |
+| Symbol without a suffix | 15 minutes (900 seconds) | `BTC` |
+| Symbol followed by `60` | 1 hour (3,600 seconds) | `BTC60` |
+| Symbol followed by `240` | 4 hours (14,400 seconds) | `BTC240` |
+
+## AFK updates
+
+`PATCH /afk/strategies/{strategy_id}` uses different switch semantics from creation and queries:
+
+| Field | Creation and GET responses | PATCH input |
+|---|---|---|
+| `limit_order_copy` | `0`: market; `1`: limit | `1`: switch modes; `0` or omission: keep the current mode |
+| `use_kdj`, `use_macd`, `use_atr` | `0`: disabled; `1`: enabled | `1`: toggle the filter; `0` or omission: keep its current state |
+
+Each new update operation with a switch set to `1` toggles that setting again. Retry the same operation with its original `Idempotency-Key` and body. For `time_start_sec` and `time_end_sec`, omission or `0` keeps the current value, while `-1` resets it to `0`.
+
+A successful PATCH response acknowledges the update; its `data` is not a snapshot of the final settings. Call `GET /afk/strategies/{strategy_id}` after updating to read the resulting configuration.
+
 ## Integration checklist
 
 1. Add `Idempotency-Key` to copytrade and AFK writes on all requests. See the [complete list](/concepts/idempotency). Missing required keys return HTTP `400`.
 2. Request explicit scopes when issuing user keys. New user keys default to five read-only scopes. Existing scopes remain unchanged; write access requires a configured IP whitelist. See [Partner API](/concepts/partner-api).
 3. A replayed request can return its original response format. Handle that response without starting another operation.
 4. Use the documented retry rules consistently across all clients that send writes.
-5. Verify user provisioning, wallet readiness, scope rejection, queries, same-key replay, and key revocation in your integration environment. Test redemption and auto-claim with a controlled test account before enabling them for users.
+5. Verify user provisioning, wallet readiness, scope rejection, queries, replay with the same `Idempotency-Key`, and key revocation in your integration environment. Test redemption and auto-claim with a controlled test account before enabling them for users.
 
-Keep the original request and idempotency key when recovering a result. A timeout or `5xx` is not proof that an operation did not execute.
+Keep the original request and `Idempotency-Key` when recovering a result. A timeout or `5xx` is not proof that an operation did not execute.

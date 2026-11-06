@@ -34,13 +34,13 @@ PolyCop OpenAPI is the third-party API for wallets, orders, portfolio history, r
 
 <Steps>
   <Step title="Obtain an API key">
-    Contact PolyCop to receive an API key for your account. Store the secret immediately. It is shown only once.
+    Use a direct account key or a Partner user key with `wallet:read`. If you have a Partner management key, follow [Partner API](/concepts/partner-api) to create a user and issue their key. Save the secret from the creation response securely; an idempotent retry of the same user-key issuance can replay that response.
   </Step>
   <Step title="Build your HMAC-SHA256 signature">
     Build the canonical string from the method, path, query, timestamp, nonce, and body hash. Then sign it with your secret key using HMAC-SHA256.
   </Step>
   <Step title="Send your first authenticated request">
-    Call `GET /wallet` with the four required headers: `X-API-Key`, `X-Timestamp`, `X-Nonce`, and `X-Signature`.
+    Call `GET /wallet` using a key with `wallet:read` and the four required headers: `X-API-Key`, `X-Timestamp`, `X-Nonce`, and `X-Signature`.
   </Step>
   <Step title="Explore the full API">
     Use the API reference for request bodies, response schemas, and error responses.

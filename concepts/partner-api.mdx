@@ -86,7 +86,7 @@ The readiness response checks the account state and the current key's scopes and
 
 You can run this flow in your own Telegram bot. Map each authenticated Telegram user to a stable `external_user_id` in your system, and keep Partner and user credentials on your backend. Opening a bot link does not grant API access or connect an existing account.
 
-This Partner flow does not require opening the PolyCop bot. Connecting an existing PolyCop account or wallet through Telegram requires a separate account-linking design and is outside these endpoints.
+You can use your own Telegram bot for this flow. These endpoints create Partner user accounts; they do not connect an existing PolyCop account or wallet.
 
 ## List and manage users
 
@@ -120,13 +120,13 @@ Revoking a Partner Key does not revoke its user keys. This lets you rotate the p
 
 ## Key expiration and rotation
 
-Every API key is limited to 180 days from creation. Normal and Partner Keys default to 180 days. A user key defaults to the earlier of its issuing Partner Key deadline and its own 180-day limit. You can supply an earlier RFC3339 `expires_at` when requesting a user key. A past deadline or one beyond either limit returns `400 VALIDATION_FAILED`.
+Every API key is limited to 180 days from creation. Direct account keys and Partner Keys default to 180 days. A user key defaults to the earlier of its issuing Partner Key deadline and its own 180-day limit. You can supply an earlier RFC3339 `expires_at` when requesting a user key. A past deadline or one beyond either limit returns `400 VALIDATION_FAILED`.
 
 Store the returned `expires_at` alongside the key. Resetting a secret does not extend this deadline, and expired keys cannot be reset. Create replacement keys before expiration. An expired key returns `401 API_KEY_INVALID` on authenticated requests. Expired keys do not consume the active-key quota.
 
 Revoking or rotating the parent does not change the deadline stored for its user keys.
 
-Retrying key issuance with the same idempotency key returns the original result and `expires_at`. It does not renew an expired user key or create a new one. An expired parent cannot retrieve that cached response. Issue a replacement as a separate operation.
+Retrying key issuance with the same `Idempotency-Key` returns the original result and `expires_at`. It does not renew an expired user key or create a new one. An expired parent cannot retrieve that cached response. Issue a replacement as a separate operation.
 
 ## Compatibility with older keys
 
@@ -134,4 +134,4 @@ A legacy Partner Key with trading permissions operates on the partner account. P
 
 Existing keys retain their original creation date for the 180-day limit. Existing user keys are also capped by the issuing parent deadline. Contact PolyCop if you need help replacing an older key.
 
-Older issuance responses may omit `expires_at`, but those keys still expire. Confirm the deadline with PolyCop or issue a replacement as a separate operation with a new idempotency key.
+Older issuance responses may omit `expires_at`, but those keys still expire. Confirm the deadline with PolyCop or issue a replacement as a separate operation with a new `Idempotency-Key`.
