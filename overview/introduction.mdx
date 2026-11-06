@@ -68,22 +68,27 @@ When a request fails, `code` contains a non-`OK` value and `data` is usually `nu
 
 Use `code` together with the HTTP status. Log `request_id` with failed requests.
 
-## Key constraints
+## API requirements
 
-Check these wallet, authentication, withdrawal, and client requirements before connecting your application.
+### Wallets and authentication
 
-<Note>
-  The API works only with custodial wallets. PolyCop manages their private keys; you do not manage them directly.
-</Note>
+The API works only with custodial wallets. PolyCop manages their private keys; you do not manage them directly.
 
-<Note>
-  Every API request must include `X-API-Key`, `X-Timestamp`, `X-Nonce`, and `X-Signature`. Trading operations do not require 2FA. Eligible withdrawal requests require 2FA. Partner user keys cannot withdraw.
-</Note>
+Include these headers in every API request:
 
-<Note>
-  Existing Polymarket CLOB clients need changes to work with this API. Changing the base URL alone is not enough.
-</Note>
+- `X-API-Key`
+- `X-Timestamp`
+- `X-Nonce`
+- `X-Signature`
 
-<Note>
-  In v1, you can withdraw on Polygon only. Wallet responses may also list deposit addresses. They do not enable withdrawals on other networks.
-</Note>
+See [Authentication](/concepts/authentication) for signing instructions. Trading operations do not require 2FA.
+
+### Withdrawals
+
+The API v1 [withdrawal endpoint](/api-reference/wallet/create-a-polygon-withdrawal) supports Polygon only. Set `network` to `polygon`.
+
+Eligible withdrawal requests require 2FA. Partner user API keys cannot withdraw.
+
+## Client compatibility
+
+PolyCop uses its own authentication and request formats. Follow the [Authentication](/concepts/authentication) guide and [API reference](/api-reference/partner/list-partner-users) to integrate. Polymarket CLOB SDKs cannot connect to this API by changing the base URL alone.
