@@ -54,10 +54,11 @@ paths:
       - Partner
       summary: List partner users
       operationId: listPartnerUsers
-      description: Requires a partner API key with `partner:users:manage` or `*` scope.
-        Results are ordered by newest partner user first. Use the returned `next_cursor`
-        as the next request's `cursor`. The response contains non-sensitive partner
-        user information only.
+      description: Requires a partner API key with `partner:users:manage` scope. Legacy
+        Partner Keys may use `*`; new keys reject wildcard scopes. Results are ordered
+        by newest partner user first. Use the returned `next_cursor` as the next request's
+        `cursor`. Results include user identifiers, wallet state and addresses, creation
+        time, and recent activity; secrets are omitted.
       security:
       - ApiKeyAuth: []
         ApiTimestamp: []
@@ -97,7 +98,8 @@ paths:
       - Partner
       summary: Create or get a partner user
       operationId: createPartnerUser
-      description: Requires a partner API key with `partner:users:manage` or `*` scope.
+      description: Requires a partner API key with `partner:users:manage` scope. Legacy
+        Partner Keys may use `*`; new keys reject wildcard scopes.
       security:
       - ApiKeyAuth: []
         ApiTimestamp: []
@@ -145,13 +147,14 @@ paths:
       - Partner
       summary: Create a user API key for a partner user
       operationId: createPartnerUserApiKey
-      description: Requires a partner API key with `partner:api_keys:manage` or `*`
-        scope. The partner user must have `wallet_status=ready`; if it is `pending`
-        or `failed`, retry create-or-get for the same `external_user_id` before creating
-        the user API key. The returned secret is issued only once; an idempotent replay
+      description: Requires a partner API key with `partner:api_keys:manage` scope.
+        Legacy Partner Keys may use `*`; new keys reject wildcard scopes. The partner
+        user must have `wallet_status=ready`; if it is `pending` or `failed`, retry
+        create-or-get for the same `external_user_id` before creating the user API
+        key. Save the secret from the creation response securely. An idempotent replay
         returns the original secret and expires_at without extending the deadline,
-        even if that child key has since expired. Use a new business intent to issue
-        a replacement key.
+        even if the user key has since expired. Issue a replacement as a separate
+        operation.
       security:
       - ApiKeyAuth: []
         ApiTimestamp: []
@@ -206,10 +209,10 @@ paths:
       - Partner
       summary: Revoke a user API key for a partner user
       operationId: revokePartnerUserApiKey
-      description: Requires a partner API key with `partner:api_keys:manage` or `*`
-        scope. Only revokes user API keys created by the authenticated partner for
-        the specified `user_account_id`; it cannot revoke another partner's keys or
-        direct user keys.
+      description: Requires a partner API key with `partner:api_keys:manage` scope.
+        Legacy Partner Keys may use `*`; new keys reject wildcard scopes. Only revokes
+        user API keys created by the authenticated partner for the specified `user_account_id`;
+        it cannot revoke another partner's keys or direct user keys.
       security:
       - ApiKeyAuth: []
         ApiTimestamp: []
@@ -299,6 +302,10 @@ paths:
           "$ref": "#/components/responses/InternalServerError"
         '502':
           "$ref": "#/components/responses/DependencyUnavailable"
+      description: |-
+        Required scope: `wallet:read`.
+
+        Returns wallet addresses and balances for the authenticated account.
   "/wallet/withdraw":
     post:
       x-required-scope: withdraw:create
@@ -309,6 +316,8 @@ paths:
       parameters:
       - "$ref": "#/components/parameters/RequiredIdempotencyKey"
       description: |-
+        Required scope: `withdraw:create`.
+
         Creates a Polygon withdrawal for an eligible account. Telegram accounts and Partner user keys receive 403 FORBIDDEN. Status queries remain available.
         Requires 2FA and Idempotency-Key. Keep the original key and exact body, including 2fa, on retries; refresh the HMAC signing headers. A different body with the same key returns CONFLICT. Idempotency covers the account across credentials and withdrawal routes; records do not expire automatically. Recover a lost response with GET /wallet/withdrawals/by-key.
         Limit: 5 requests per minute per account. Only one withdrawal may be processing, submitting, or submitted at a time. A new withdrawal requires the previous one to be succeeded or failed.
@@ -368,6 +377,8 @@ paths:
       - Wallet
       summary: Recover a withdrawal by its original idempotency key
       description: |-
+        Required scope: `wallet:read`.
+
         All recovery responses use Cache-Control: no-store; the key is a request header, not a cache selector.
         Read-only recovery scoped to the authenticated account; API keys require wallet:read.
         Returns the current withdrawal status without OTP or resubmission. Historical records have no key association and may return 404. A 404 is not
@@ -455,6 +466,10 @@ paths:
           "$ref": "#/components/responses/InternalServerError"
         '502':
           "$ref": "#/components/responses/DependencyUnavailable"
+      description: |-
+        Required scope: `wallet:read`.
+
+        Returns the status of a withdrawal belonging to the authenticated account.
   "/orders":
     post:
       x-required-scope: trade:order
@@ -523,14 +538,19 @@ paths:
           "$ref": "#/components/responses/RateLimited"
         '500':
           "$ref": "#/components/responses/InternalServerError"
+      description: |-
+        Required scope: `trade:order`.
+
+        Places an order for the authenticated account. Requires Idempotency-Key. Keep the original key and request when retrying; order idempotency applies across credentials for the same account.
     get:
       x-required-scope: trade:read
       tags:
       - Orders
       summary: List account orders
-      description: Returns an empty `items` array when the account has no matching
-        orders. Items preserve the order returned by the service; `sortBy` and `sortDirection`
-        are not supported query parameters and do not change the result order.
+      description: |-
+        Required scope: `trade:read`.
+
+        Returns an empty `items` array when the account has no matching orders. Items preserve the order returned by the service; `sortBy` and `sortDirection` are not supported query parameters and do not change the result order.
       operationId: listOrders
       security:
       - ApiKeyAuth: []
@@ -572,8 +592,10 @@ paths:
       tags:
       - Orders
       summary: Get an order by order id
-      description: Returns `ORDER_NOT_FOUND` when the order does not exist or does
-        not belong to the current account.
+      description: |-
+        Required scope: `trade:read`.
+
+        Returns `ORDER_NOT_FOUND` when the order does not exist or does not belong to the current account.
       operationId: getOrder
       security:
       - ApiKeyAuth: []
@@ -654,6 +676,10 @@ paths:
           "$ref": "#/components/responses/DependencyUnavailable"
         '503':
           "$ref": "#/components/responses/ActionResultUnavailable"
+      description: |-
+        Required scope: `trade:cancel`.
+
+        Cancels an order belonging to the authenticated account.
   "/positions":
     get:
       x-required-scope: positions:read
@@ -661,12 +687,10 @@ paths:
       - Positions
       summary: List account positions
       operationId: listPositions
-      description: Lists positions for wallets owned by the authenticated account.
-        Omit address to use the default wallet. A signing address is resolved to its
-        proxy wallet. Foreign or unverified wallets return 404, malformed addresses
-        return 400, and unavailable ownership verification returns 502. Any copytrade
-        configurations included in the response belong to the authenticated account.
-        This endpoint does not provide public wallet lookup.
+      description: |-
+        Required scope: `positions:read`.
+
+        Lists positions for wallets owned by the authenticated account. Omit address to use the default wallet. A signing address is resolved to its proxy wallet. Foreign or unverified wallets return 404, malformed addresses return 400, and unavailable ownership verification returns 502. Any copytrade configurations included in the response belong to the authenticated account. This endpoint does not provide public wallet lookup.
       security:
       - ApiKeyAuth: []
         ApiTimestamp: []
@@ -710,8 +734,10 @@ paths:
       tags:
       - Copytrade
       summary: List copytrade configs
-      description: Returns an empty `items` array when the account has no copytrade
-        configs.
+      description: |-
+        Required scope: `copytrade:read`.
+
+        Returns an empty `items` array when the account has no copytrade configs.
       operationId: listCopytradeConfigs
       security:
       - ApiKeyAuth: []
@@ -752,8 +778,10 @@ paths:
       tags:
       - Copytrade
       summary: Create a copytrade config
-      description: Creates a copytrade configuration for the authenticated account.
-        Requires API key HMAC authentication; 2FA is not required.
+      description: |-
+        Required scope: `copytrade:manage`.
+
+        Creates a copytrade configuration for the authenticated account. Requires API key HMAC authentication; 2FA is not required.
       operationId: createCopytradeConfig
       parameters:
       - "$ref": "#/components/parameters/RequiredActionIdempotencyKey"
@@ -823,8 +851,10 @@ paths:
       tags:
       - Copytrade
       summary: Get a copytrade config
-      description: Returns `COPYTRADE_CONFIG_NOT_FOUND` when the config does not exist
-        or does not belong to the current account.
+      description: |-
+        Required scope: `copytrade:read`.
+
+        Returns `COPYTRADE_CONFIG_NOT_FOUND` when the config does not exist or does not belong to the current account.
       operationId: getCopytradeConfig
       parameters:
       - "$ref": "#/components/parameters/ConfigId"
@@ -866,10 +896,10 @@ paths:
       tags:
       - Copytrade
       summary: Update a copytrade config
-      description: Updates the supported fields of a copytrade configuration. Omit
-        target_address to keep it unchanged. Boolean fields specify the desired final
-        state. keyword_whitelist and keyword_blacklist are create-only and rejected
-        on update.
+      description: |-
+        Required scope: `copytrade:manage`.
+
+        Updates the supported fields of a copytrade configuration. Omit target_address to keep it unchanged. Boolean fields specify the desired final state. keyword_whitelist and keyword_blacklist are create-only and rejected on update.
       operationId: updateCopytradeConfig
       parameters:
       - "$ref": "#/components/parameters/RequiredActionIdempotencyKey"
@@ -961,16 +991,20 @@ paths:
           "$ref": "#/components/responses/DependencyUnavailable"
         '503':
           "$ref": "#/components/responses/ActionResultUnavailable"
+      description: |-
+        Required scope: `copytrade:manage`.
+
+        Disables a copytrade configuration belonging to the authenticated account.
   "/copytrade/configs/{config_id}/keywords":
     post:
       x-required-scope: copytrade:manage
       tags:
       - Copytrade
       summary: Add a copytrade keyword
-      description: Adds one keyword to a configuration whitelist or blacklist. Use
-        this endpoint for keyword changes instead of PATCH /copytrade/configs/{config_id}.
-        The configuration must belong to the authenticated account. Only config_type=1
-        is supported.
+      description: |-
+        Required scope: `copytrade:manage`.
+
+        Adds one keyword to a configuration whitelist or blacklist. Use this endpoint for keyword changes instead of PATCH /copytrade/configs/{config_id}. The configuration must belong to the authenticated account. Only config_type=1 is supported.
       operationId: createCopytradeConfigKeyword
       parameters:
       - "$ref": "#/components/parameters/RequiredActionIdempotencyKey"
@@ -1028,9 +1062,10 @@ paths:
       tags:
       - Copytrade
       summary: Delete a copytrade keyword
-      description: Deletes the keyword identified by key_word_id. Both the path configuration
-        and the target keyword must belong to the authenticated account. Use the configuration
-        containing that keyword in the path.
+      description: |-
+        Required scope: `copytrade:manage`.
+
+        Deletes the keyword identified by key_word_id. Both the path configuration and the target keyword must belong to the authenticated account. Use the configuration containing that keyword in the path.
       operationId: deleteCopytradeConfigKeyword
       parameters:
       - "$ref": "#/components/parameters/RequiredActionIdempotencyKey"
@@ -1079,10 +1114,10 @@ paths:
       tags:
       - Copytrade
       summary: Update copytrade market type filters
-      description: Updates market-type switches. Each field accepts 1 for enabled
-        and 2 for disabled. Omit a field to leave it unchanged. config_id comes from
-        the path; do not send it in the body. The configuration must belong to the
-        authenticated account. Only config_type=1 is supported.
+      description: |-
+        Required scope: `copytrade:manage`.
+
+        Updates market-type switches. Each field accepts 1 for enabled and 2 for disabled. Omit a field to leave it unchanged. config_id comes from the path; do not send it in the body. The configuration must belong to the authenticated account. Only config_type=1 is supported.
       operationId: updateCopytradeMarketTypes
       parameters:
       - "$ref": "#/components/parameters/RequiredActionIdempotencyKey"
@@ -1140,7 +1175,10 @@ paths:
       tags:
       - AFK
       summary: List AFK strategies
-      description: Lists AFK automatic trading strategies owned by the current account.
+      description: |-
+        Required scope: `afk:read`.
+
+        Lists AFK automatic trading strategies owned by the current account.
       operationId: listAFKStrategies
       security:
       - ApiKeyAuth: []
@@ -1178,7 +1216,10 @@ paths:
       tags:
       - AFK
       summary: Create an AFK strategy
-      description: Creates an AFK automatic trading strategy.
+      description: |-
+        Required scope: `afk:manage`.
+
+        Creates an AFK automatic trading strategy.
       operationId: createAFKStrategy
       parameters:
       - "$ref": "#/components/parameters/RequiredActionIdempotencyKey"
@@ -1229,7 +1270,10 @@ paths:
       tags:
       - AFK
       summary: Get an AFK strategy
-      description: Returns one AFK strategy owned by the current account.
+      description: |-
+        Required scope: `afk:read`.
+
+        Returns one AFK strategy owned by the current account.
       operationId: getAFKStrategy
       parameters:
       - "$ref": "#/components/parameters/StrategyId"
@@ -1271,7 +1315,10 @@ paths:
       tags:
       - AFK
       summary: Update an AFK strategy
-      description: Updates an AFK automatic trading strategy.
+      description: |-
+        Required scope: `afk:manage`.
+
+        Updates an AFK automatic trading strategy. For time_start_sec and time_end_sec on PATCH, omission or `0` keeps the existing value; `-1` resets it to `0`. A reset start permits entry from the beginning of each round; a reset end uses the end of the round.
       operationId: updateAFKStrategy
       parameters:
       - "$ref": "#/components/parameters/RequiredActionIdempotencyKey"
@@ -1325,7 +1372,10 @@ paths:
       tags:
       - AFK
       summary: List AFK records
-      description: Returns AFK transaction records with cursor pagination.
+      description: |-
+        Required scope: `afk:read`.
+
+        Returns AFK transaction records with cursor pagination.
       operationId: listAFKRecords
       security:
       - ApiKeyAuth: []
@@ -1445,14 +1495,19 @@ paths:
           "$ref": "#/components/responses/InternalServerError"
         '502':
           "$ref": "#/components/responses/DependencyUnavailable"
+      description: |-
+        Required scope: `copytrade:read`.
+
+        Lists copytrade records for the authenticated account with cursor pagination.
   "/trading/readiness":
     get:
       x-required-scope: trading:read
       tags:
       - Trading
-      description: Account readiness intersected with current API key scopes. User
-        keys cannot withdraw. can_view_markets is a public-market capability, not
-        an API scope grant. Missing permissions add API_KEY_SCOPE_REQUIRED or USER_API_KEY_WITHDRAW_DISABLED.
+      description: |-
+        Required scope: `trading:read`.
+
+        Returns account and wallet readiness, action flags, and blocking reasons for the current API key at query time. Flags reflect account state, scopes, and source IP policy; they do not guarantee that a later transaction will succeed. Partner user keys always have can_withdraw=false. can_view_markets describes public market viewing, not an additional API permission.
       summary: Get trading readiness
       operationId: getTradingReadiness
       security:
@@ -1493,8 +1548,10 @@ paths:
       - Trading
       summary: List closed positions for the authenticated account
       operationId: listClosedPositions
-      description: Accepts the same query parameter names as Polymarket Data API `/closed-positions`;
-        `user` must select a wallet owned by the authenticated account.
+      description: |-
+        Required scope: `positions:read`.
+
+        Returns closed positions using the filters and offset pagination documented below. If supplied, user must select a wallet owned by the authenticated account.
       security:
       - ApiKeyAuth: []
         ApiTimestamp: []
@@ -1566,9 +1623,10 @@ paths:
       - Trading
       summary: List activity for the authenticated account
       operationId: listUserActivity
-      description: Accepts the activity query parameters supported by `go-polymarket-sdk`
-        `GetUserActivity`; `user` must select a wallet owned by the authenticated
-        account.
+      description: |-
+        Required scope: `activity:read`.
+
+        Returns account activity using the filters and offset pagination documented below. If supplied, user must select a wallet owned by the authenticated account.
       security:
       - ApiKeyAuth: []
         ApiTimestamp: []
@@ -1683,15 +1741,10 @@ paths:
       tags:
       - Trading
       summary: Redeem a redeemable position
-      description: Requests redemption for the authenticated user's default wallet
-        and condition. Requires Idempotency-Key. A completed response for the same
-        credential, key, and request is replayed for 24 hours. If the result is uncertain,
-        the API returns 409 REDEEM_RESULT_UNKNOWN; retries with that key return the
-        saved result without resubmitting. Refresh redeemable positions and confirm
-        the outcome before further action. Deduplication is not guaranteed across
-        different keys or credentials, expired records, interrupted requests, or other
-        redemption entry points. Success acknowledges submission but includes no transaction
-        ID or on-chain confirmation.
+      description: |-
+        Required scope: `positions:redeem`.
+
+        Requests redemption for the authenticated user's default wallet and condition. Requires Idempotency-Key. A completed response for the same credential, key, and request is replayed for 24 hours. If the result is uncertain, the API returns 409 REDEEM_RESULT_UNKNOWN; retries with that key return the saved result without resubmitting. Refresh redeemable positions and confirm the outcome before further action. Deduplication is not guaranteed across different keys or credentials, expired records, interrupted requests, or other redemption entry points. Success acknowledges submission but includes no transaction ID or on-chain confirmation.
       operationId: redeemPosition
       security:
       - ApiKeyAuth: []
@@ -1778,15 +1831,19 @@ paths:
           "$ref": "#/components/responses/BadRequest"
         '409':
           "$ref": "#/components/responses/Conflict"
+      description: |-
+        Required scope: `settings:read`.
+
+        Returns the automatic redemption setting for the authenticated account.
     put:
       x-required-scope: settings:manage
       tags:
       - Trading
       summary: Set automatic position redemption
-      description: 'Sets the desired automatic redemption state: auto_claim=true enables
-        it and false disables it. Returns the confirmed setting. A concurrent update
-        for the same account can return 409 CONFLICT. Refresh the current setting
-        before submitting a new update with a new idempotency key.'
+      description: |-
+        Required scope: `settings:manage`.
+
+        Sets the desired automatic redemption state: auto_claim=true enables it and false disables it. Returns the confirmed setting. A concurrent update for the same account can return 409 CONFLICT. Refresh the current setting before submitting a new update with a new idempotency key.
       operationId: updateAutoClaimSetting
       security:
       - ApiKeyAuth: []
@@ -1844,8 +1901,9 @@ components:
       type: apiKey
       in: header
       name: X-Timestamp
-      description: Unix timestamp in seconds. Default allowed clock skew is 15 seconds
-        in either direction; deployment configuration may override it.
+      description: Unix timestamp in seconds. The default allowed clock skew is 15
+        seconds in either direction. Confirm the allowed skew for your environment
+        with PolyCop.
     ApiNonce:
       type: apiKey
       in: header
@@ -1880,8 +1938,8 @@ components:
       required: false
       schema:
         type: string
-      description: Cursor returned as `next_cursor` from the previous page. OpenAPI
-        does not support offset pagination.
+      description: Cursor from the previous response for the next page. This endpoint
+        uses cursor pagination and does not support offset.
     IdempotencyKey:
       name: Idempotency-Key
       in: header
@@ -2369,15 +2427,13 @@ components:
         scopes:
           type: array
           maxItems: 32
-          description: |
-            Defaults to read-only scopes: trade:read, wallet:read, positions:read, copytrade:read and afk:read.
-            Explicit trading and automation write scopes remain supported; no monetary budgets are enforced.
-            Additional read scopes are trading:read, activity:read and settings:read.
-            Explicit write scopes include trade:order, trade:cancel, copytrade:manage, afk:manage,
-            positions:redeem and settings:manage. Write scopes require a non-empty ip_whitelist.
-            The wildcard scope `*` is not accepted for partner user keys.
-            `withdraw:create` is not supported for partner user API keys in V1.
-            A future withdrawal extension requires a separate partner-user 2FA binding flow.
+          description: Defaults to trade:read, wallet:read, positions:read, copytrade:read,
+            and afk:read. Additional read scopes are trading:read, activity:read,
+            and settings:read. Explicit write scopes include trade:order, trade:cancel,
+            copytrade:manage, afk:manage, positions:redeem, and settings:manage. Write
+            scopes require a nonempty ip_whitelist. User keys cannot use `*` or `withdraw:create`.
+            API keys have no independent monetary spending cap; strategy settings
+            are separate.
           items:
             type: string
           example:
@@ -2411,7 +2467,9 @@ components:
         properties:
           secret:
             type: string
-            description: API key secret. Shown only once.
+            description: API signing secret returned in the creation response. Save
+              it securely; there is no separate retrieval endpoint. An idempotent
+              retry of the same user-key issuance can replay the original response.
             example: sk_xxx
     ApiKey:
       type: object
@@ -2960,230 +3018,296 @@ components:
       - config_id
       - target_address
       - status
-      description: Copytrade configuration. Status 0 is exposed as paused.
+      description: Copytrade configuration and its current settings.
       properties:
         telegram_id:
           type: string
-          description: "`telegram_id`."
+          description: Account identifier associated with this configuration. Do not
+            assume it is the person’s Telegram user ID; use user_account_id for Partner
+            user management.
         config_id:
           type: string
           example: '123'
-          description: "`config_id`."
+          description: Copytrade configuration ID. Use this value in configuration
+            request paths.
         target_address:
           type: string
-          description: "`target_address`."
+          description: Trader wallet address to follow.
         tag:
           type: string
           nullable: true
-          description: "`tag`."
+          description: User-visible label for this copytrade configuration.
         copy_percentage:
           type: string
           nullable: true
-          description: "`copy_percentage`."
+          description: Percentage of the source buy amount to copy, expressed as a
+            decimal string; `50` means 50%. A positive copy_fixed_amount takes precedence.
         limit_order_copy:
           type: boolean
           nullable: true
-          description: "`limit_order_copy`."
+          description: Whether copied buys use limit orders; false selects market
+            orders.
         limit_order_validity_period:
           type: string
           nullable: true
-          description: "`limit_order_validity_period`."
+          description: Buy limit-order lifetime in seconds, expressed as a string.
+            A positive value sets an expiration; without a positive value the order
+            remains good until cancelled.
         max_limit_order_price_diff:
           type: string
           nullable: true
-          description: "`max_limit_order_price_diff`."
+          description: Price offset added to the copied buy price when order-book
+            pricing is disabled. An absolute decimal price difference, not a percentage.
         max_token_spend:
           type: string
           nullable: true
-          description: "`max_token_spend`."
+          description: Maximum buy spend per outcome token, in USD, for this configuration.
+            A positive value enables the limit; turbo mode bypasses it.
         total_token_spend:
           type: string
           nullable: true
-          description: "`total_token_spend`."
+          description: Maximum total buy spend in USD for this configuration, not
+            the amount already spent. A positive value enables the limit; turbo mode
+            bypasses it.
         buy_at_min:
           type: boolean
           nullable: true
-          description: "`buy_at_min`."
+          description: Whether to raise a copied buy to the applicable minimum order
+            amount or share quantity when it would otherwise be too small.
         create_dt:
           type: string
           nullable: true
-          description: "`create_dt` unix timestamp as a string."
+          description: Configuration creation time as a Unix timestamp string.
         copy_fixed_amount:
           type: string
           nullable: true
-          description: "`copy_fixed_amount`."
+          description: Fixed buy amount in USD, expressed as a decimal string. A positive
+            value takes precedence over percentage sizing and per-trade sizing bounds.
         min_trader_trade_amount:
           type: string
           nullable: true
-          description: "`min_trader_trade_amount`."
+          description: Minimum source buy value in USD eligible for copying. Decimal
+            string.
         min_copy_amount_per_trade:
           type: string
           nullable: true
-          description: "`min_copy_amount_per_trade`."
+          description: Minimum copied buy amount in USD for percentage-based sizing.
+            Not applied when copy_fixed_amount is positive.
         max_copy_amount_per_trade:
           type: string
           nullable: true
-          description: "`max_copy_amount_per_trade`."
+          description: Maximum copied buy amount in USD for percentage-based sizing.
+            Not applied when copy_fixed_amount is positive.
         min_price:
           type: string
           nullable: true
-          description: "`min_price`."
+          description: Minimum outcome-token price eligible for copied buys. Decimal
+            string.
         max_price:
           type: string
           nullable: true
-          description: "`max_price`."
+          description: Maximum outcome-token price eligible for copied buys. Decimal
+            string.
         slippage:
           type: string
           nullable: true
-          description: "`slippage`."
+          description: Buy market-order slippage percentage, expressed as a decimal
+            string; `2` means 2%.
         max_spend_per_market:
           type: string
           nullable: true
-          description: "`max_spend_per_market`."
+          description: Maximum buy spend per market in USD for this configuration.
+            A positive value enables the limit; turbo mode bypasses it.
         max_holder_market_number:
           type: string
           nullable: true
-          description: "`max_holder_market_number`."
+          description: Maximum number of markets held by this configuration. Positive
+            integer string; turbo mode bypasses this limit.
         take_profit_percentage:
           type: string
           nullable: true
-          description: "`take_profit_percentage`."
+          description: Take-profit increase from the entry price, in percent; `10`
+            means 10%. A positive take_profit_price takes precedence.
         take_profit_price:
           type: string
           nullable: true
-          description: "`take_profit_price`."
+          description: Absolute outcome-token price that triggers take profit. Decimal
+            string; a positive value takes precedence over take_profit_percentage.
         stop_loss_percentage:
           type: string
           nullable: true
-          description: "`stop_loss_percentage`."
+          description: Stop-loss decrease from the entry price, in percent; `10` means
+            10%. A positive stop_loss_price takes precedence.
         stop_loss_price:
           type: string
           nullable: true
-          description: "`stop_loss_price`."
+          description: Absolute outcome-token price that triggers stop loss. Decimal
+            string; a positive value takes precedence over stop_loss_percentage.
         copy_buy:
           type: boolean
           nullable: true
-          description: "`copy_buy`."
+          description: Whether to copy source buy trades.
         copy_sell:
           type: boolean
           nullable: true
-          description: "`copy_sell`."
+          description: Whether to copy source sell trades.
         market_sell_slippage:
           type: string
           nullable: true
-          description: "`market_sell_slippage`."
+          description: Sell market-order slippage percentage, expressed as a decimal
+            string; `2` means 2%.
         sell_limit_order_copy:
           type: boolean
           nullable: true
-          description: "`sell_limit_order_copy`."
+          description: Whether copied sells use limit orders; false selects market
+            orders.
         sell_limit_order_price_diff:
           type: string
           nullable: true
-          description: "`sell_limit_order_price_diff`."
+          description: Price offset added to the copied sell price when order-book
+            pricing is disabled. An absolute decimal price difference, not a percentage.
         sell_limit_order_validity_period:
           type: string
           nullable: true
-          description: "`sell_limit_order_validity_period`."
+          description: Sell limit-order lifetime in seconds, expressed as a string.
+            A positive value sets an expiration; without a positive value the order
+            remains good until cancelled.
         max_5m_market_start_time:
           type: string
           nullable: true
-          description: "`max_5m_market_start_time`."
+          description: Copy buys in 5-minute Up/Down markets within this many seconds
+            after the market opens. Positive integer string. If both start and end
+            windows are positive, either window permits copying. If neither is positive,
+            no time-window restriction applies. Turbo mode bypasses this check.
         max_5m_market_end_time:
           type: string
           nullable: true
-          description: "`max_5m_market_end_time`."
+          description: Copy buys in 5-minute Up/Down markets within this many seconds
+            before the market closes. Positive integer string. If both start and end
+            windows are positive, either window permits copying. If neither is positive,
+            no time-window restriction applies. Turbo mode bypasses this check.
         max_15m_market_start_time:
           type: string
           nullable: true
-          description: "`max_15m_market_start_time`."
+          description: Copy buys in 15-minute Up/Down markets within this many seconds
+            after the market opens. Positive integer string. If both start and end
+            windows are positive, either window permits copying. If neither is positive,
+            no time-window restriction applies. Turbo mode bypasses this check.
         max_15m_market_end_time:
           type: string
           nullable: true
-          description: "`max_15m_market_end_time`."
+          description: Copy buys in 15-minute Up/Down markets within this many seconds
+            before the market closes. Positive integer string. If both start and end
+            windows are positive, either window permits copying. If neither is positive,
+            no time-window restriction applies. Turbo mode bypasses this check.
         tp_balance_threshold:
           type: string
           nullable: true
-          description: "`tp_balance_threshold`."
+          description: Account-value threshold for pausing this configuration when
+            the value is at or above it. Account value includes available trading
+            balance and position value. Decimal amount.
         sl_balance_threshold:
           type: string
           nullable: true
-          description: "`sl_balance_threshold`."
+          description: Account-value threshold for pausing this configuration when
+            the value is at or below it. Account value includes available trading
+            balance and position value. Decimal amount.
         reverse_copy:
           type: boolean
           nullable: true
-          description: "`reverse_copy`."
+          description: Whether to copy the opposite market outcome. This changes the
+            outcome token, not the buy/sell side.
         is_master:
           type: boolean
           nullable: true
-          description: "`is_master`."
+          description: Whether this configuration uses the main wallet (true) or a
+            sub-wallet (false).
         total_investment:
           type: string
           nullable: true
-          description: "`total_investment`."
+          description: Investment amount allocated to this configuration. Decimal
+            amount.
         wallet_address:
           type: string
           nullable: true
-          description: "`wallet_address`."
+          description: The copier’s main wallet signing address.
         proxy_address:
           type: string
           nullable: true
-          description: "`proxy_address`."
+          description: The copier’s main proxy wallet address.
         sub_address:
           type: string
           nullable: true
-          description: "`sub_address`."
+          description: Sub-wallet signing address used for an isolated configuration,
+            when present.
         sub_proxy_address:
           type: string
           nullable: true
-          description: "`sub_proxy_address`."
+          description: Sub-wallet proxy address used for an isolated configuration,
+            when present.
         max_trader_trade_amount:
           type: string
           nullable: true
-          description: "`max_trader_trade_amount`."
+          description: Maximum source buy value in USD eligible for copying. Decimal
+            string.
         failure_retry:
           type: string
           nullable: true
-          description: "`failure_retry`."
+          description: Number of retries after an eligible copy-order failure, expressed
+            as an integer string. Execution limits retries to at most 3.
         limit_expired_to_market:
           type: boolean
           nullable: true
-          description: "`limit_expired_to_market`."
+          description: Whether an expired copied limit order may be retried as a market
+            order.
         use_buy_order_book:
           type: boolean
           nullable: true
-          description: "`use_buy_order_book`."
+          description: Whether to select the copied buy limit price from the order
+            book instead of applying max_limit_order_price_diff.
         buy_bid_level:
           type: string
           nullable: true
-          description: "`buy_bid_level`."
+          description: Order-book bid level for copied buy limit orders in `bid` mode.
+            Positive integer string; `1` selects the best bid price.
         buy_ask_level:
           type: string
           nullable: true
-          description: "`buy_ask_level`."
+          description: Order-book ask level for copied buy limit orders in `ask` mode.
+            Positive integer string; `1` selects the best ask price.
         use_sell_order_book:
           type: boolean
           nullable: true
-          description: "`use_sell_order_book`."
+          description: Whether to select the copied sell limit price from the order
+            book instead of applying sell_limit_order_price_diff.
         sell_bid_level:
           type: string
           nullable: true
-          description: "`sell_bid_level`."
+          description: Order-book bid level for copied sell limit orders in `bid`
+            mode. Positive integer string; `1` selects the best bid price.
         sell_ask_level:
           type: string
           nullable: true
-          description: "`sell_ask_level`."
+          description: Order-book ask level for copied sell limit orders in `ask`
+            mode. Positive integer string; `1` selects the best ask price.
         buy_order_book_mode:
           type: string
           nullable: true
-          description: "`buy_order_book_mode`."
+          description: 'Price source for copied buy limit orders when use_buy_order_book
+            is true: `bid`, `ask`, or `mid` (midpoint of best bid and ask). Bid or
+            ask mode requires its matching level only; mid accepts neither level.'
         sell_order_book_mode:
           type: string
           nullable: true
-          description: "`sell_order_book_mode`."
+          description: 'Price source for copied sell limit orders when use_sell_order_book
+            is true: `bid`, `ask`, or `mid` (midpoint of best bid and ask). Bid or
+            ask mode requires its matching level only; mid accepts neither level.'
         turbo_mode:
           type: boolean
           nullable: true
-          description: "`turbo_mode`."
+          description: Whether to enable turbo mode. It bypasses buy spend caps, held-market
+            limits, market-type and keyword filters, and the 5/15-minute market-window
+            checks.
         status:
           "$ref": "#/components/schemas/CopytradeStatus"
         created_at:
@@ -3211,126 +3335,162 @@ components:
           description: Trader wallet address to follow.
         tag:
           type: string
-          description: User-visible label for this copytrade config.
+          description: User-visible label for this copytrade configuration.
         copy_percentage:
           type: string
-          description: Percentage of the trader's order size to copy. Decimal string;
+          description: Percentage of the source buy amount to copy, expressed as a
+            decimal string; `50` means 50%. A positive copy_fixed_amount takes precedence.
         limit_order_copy:
           type: boolean
-          description: Whether to copy buy limit orders. On PATCH, specify the desired
-            final state.
+          description: Whether copied buys use limit orders; false selects market
+            orders.
         limit_order_validity_period:
           type: string
-          description: Validity period for copied buy limit orders. Decimal/integer
-            string.
+          description: Buy limit-order lifetime in seconds, expressed as a string.
+            A positive value sets an expiration; without a positive value the order
+            remains good until cancelled.
         max_limit_order_price_diff:
           type: string
-          description: Maximum allowed price difference for copied buy limit orders.
-            Decimal string.
+          description: Price offset added to the copied buy price when order-book
+            pricing is disabled. An absolute decimal price difference, not a percentage.
         max_token_spend:
           type: string
-          description: Maximum token spend cap for this config. Decimal string.
+          description: Maximum buy spend per outcome token, in USD, for this configuration.
+            A positive value enables the limit; turbo mode bypasses it.
         total_token_spend:
           type: string
-          description: Total token spend cap for this config. Decimal string.
+          description: Maximum total buy spend in USD for this configuration, not
+            the amount already spent. A positive value enables the limit; turbo mode
+            bypasses it.
         buy_at_min:
           type: boolean
-          description: Whether buy copy should use minimum-price behavior.
+          description: Whether to raise a copied buy to the applicable minimum order
+            amount or share quantity when it would otherwise be too small.
         copy_fixed_amount:
           type: string
-          description: Fixed amount to copy per trade. Decimal string.
+          description: Fixed buy amount in USD, expressed as a decimal string. A positive
+            value takes precedence over percentage sizing and per-trade sizing bounds.
         min_trader_trade_amount:
           type: string
-          description: Minimum source trader trade amount required before copying.
-            Decimal string.
+          description: Minimum source buy value in USD eligible for copying. Decimal
+            string.
         max_trader_trade_amount:
           type: string
-          description: Maximum source trader trade amount allowed for copying. Decimal
+          description: Maximum source buy value in USD eligible for copying. Decimal
             string.
         min_copy_amount_per_trade:
           type: string
-          description: Minimum copied amount per trade. Decimal string.
+          description: Minimum copied buy amount in USD for percentage-based sizing.
+            Not applied when copy_fixed_amount is positive.
         max_copy_amount_per_trade:
           type: string
-          description: Maximum copied amount per trade. Decimal string.
+          description: Maximum copied buy amount in USD for percentage-based sizing.
+            Not applied when copy_fixed_amount is positive.
         min_price:
           type: string
-          description: Minimum market/order price allowed for copying. Decimal string.
+          description: Minimum outcome-token price eligible for copied buys. Decimal
+            string.
         max_price:
           type: string
-          description: Maximum market/order price allowed for copying. Decimal string.
+          description: Maximum outcome-token price eligible for copied buys. Decimal
+            string.
         slippage:
           type: string
-          description: Buy-side market-order slippage tolerance. Decimal string.
+          description: Buy market-order slippage percentage, expressed as a decimal
+            string; `2` means 2%.
         max_spend_per_market:
           type: string
-          description: Maximum spend cap per market. Decimal string.
+          description: Maximum buy spend per market in USD for this configuration.
+            A positive value enables the limit; turbo mode bypasses it.
         max_holder_market_number:
           type: string
-          description: Maximum number of holder markets allowed. Integer string.
+          description: Maximum number of markets held by this configuration. Positive
+            integer string; turbo mode bypasses this limit.
         take_profit_percentage:
           type: string
-          description: Take-profit trigger percentage. Decimal string.
+          description: Take-profit increase from the entry price, in percent; `10`
+            means 10%. A positive take_profit_price takes precedence.
         take_profit_price:
           type: string
-          description: Take-profit trigger price. Decimal string.
+          description: Absolute outcome-token price that triggers take profit. Decimal
+            string; a positive value takes precedence over take_profit_percentage.
         stop_loss_percentage:
           type: string
-          description: Stop-loss trigger percentage. Decimal string.
+          description: Stop-loss decrease from the entry price, in percent; `10` means
+            10%. A positive stop_loss_price takes precedence.
         stop_loss_price:
           type: string
-          description: Stop-loss trigger price. Decimal string.
+          description: Absolute outcome-token price that triggers stop loss. Decimal
+            string; a positive value takes precedence over stop_loss_percentage.
         copy_buy:
           type: boolean
-          description: Whether buy trades are copied. On PATCH, specify the desired
-            final state.
+          description: Whether to copy source buy trades.
         copy_sell:
           type: boolean
-          description: Whether sell trades are copied. On PATCH, specify the desired
-            final state.
+          description: Whether to copy source sell trades.
         market_sell_slippage:
           type: string
-          description: Sell-side market-order slippage tolerance. Decimal string.
+          description: Sell market-order slippage percentage, expressed as a decimal
+            string; `2` means 2%.
         sell_limit_order_copy:
           type: boolean
-          description: Whether to copy sell limit orders. On PATCH, specify the desired
-            final state.
+          description: Whether copied sells use limit orders; false selects market
+            orders.
         sell_limit_order_price_diff:
           type: string
-          description: Maximum allowed price difference for copied sell limit orders.
-            Decimal string.
+          description: Price offset added to the copied sell price when order-book
+            pricing is disabled. An absolute decimal price difference, not a percentage.
         sell_limit_order_validity_period:
           type: string
-          description: Validity period for copied sell limit orders. Decimal/integer
-            string.
+          description: Sell limit-order lifetime in seconds, expressed as a string.
+            A positive value sets an expiration; without a positive value the order
+            remains good until cancelled.
         max_5m_market_start_time:
           type: string
-          description: Earliest allowed start-time window for 5-minute markets. String.
+          description: Copy buys in 5-minute Up/Down markets within this many seconds
+            after the market opens. Positive integer string. If both start and end
+            windows are positive, either window permits copying. If neither is positive,
+            no time-window restriction applies. Turbo mode bypasses this check.
         max_5m_market_end_time:
           type: string
-          description: Latest allowed end-time window for 5-minute markets. String.
+          description: Copy buys in 5-minute Up/Down markets within this many seconds
+            before the market closes. Positive integer string. If both start and end
+            windows are positive, either window permits copying. If neither is positive,
+            no time-window restriction applies. Turbo mode bypasses this check.
         max_15m_market_start_time:
           type: string
-          description: Earliest allowed start-time window for 15-minute markets. String.
+          description: Copy buys in 15-minute Up/Down markets within this many seconds
+            after the market opens. Positive integer string. If both start and end
+            windows are positive, either window permits copying. If neither is positive,
+            no time-window restriction applies. Turbo mode bypasses this check.
         max_15m_market_end_time:
           type: string
-          description: Latest allowed end-time window for 15-minute markets. String.
+          description: Copy buys in 15-minute Up/Down markets within this many seconds
+            before the market closes. Positive integer string. If both start and end
+            windows are positive, either window permits copying. If neither is positive,
+            no time-window restriction applies. Turbo mode bypasses this check.
         tp_balance_threshold:
           type: string
-          description: Balance threshold used by take-profit logic. Decimal string.
+          description: Account-value threshold for pausing this configuration when
+            the value is at or above it. Account value includes available trading
+            balance and position value. Decimal amount.
         sl_balance_threshold:
           type: string
-          description: Balance threshold used by stop-loss logic. Decimal string.
+          description: Account-value threshold for pausing this configuration when
+            the value is at or below it. Account value includes available trading
+            balance and position value. Decimal amount.
         reverse_copy:
           type: boolean
-          description: Whether to invert copied trade direction. On PATCH, specify
-            the desired final state.
+          description: Whether to copy the opposite market outcome. This changes the
+            outcome token, not the buy/sell side.
         is_master:
           type: boolean
-          description: Create-only flag; not supported by configuration updates.
+          description: Whether this configuration uses the main wallet (true) or a
+            sub-wallet (false). Set at creation; not supported by configuration updates.
         total_investment:
           type: string
-          description: Create-only total investment amount. Decimal string.
+          description: Investment amount allocated to this configuration. Decimal
+            amount. Set at creation; not supported by configuration updates.
         only_copy_markets_types:
           "$ref": "#/components/schemas/CopytradeMarketTypesInput"
         keyword_whitelist:
@@ -3347,46 +3507,59 @@ components:
             type: string
         failure_retry:
           type: string
-          description: Retry count/strategy value used after copy failure. String.
+          description: Number of retries after an eligible copy-order failure, expressed
+            as an integer string. Execution limits retries to at most 3.
         limit_expired_to_market:
           type: boolean
-          description: Whether expired copied limit orders may fall back to market
-            orders.
+          description: Whether an expired copied limit order may be retried as a market
+            order.
         use_buy_order_book:
           type: boolean
-          description: Whether buy copy uses order-book level settings.
+          description: Whether to select the copied buy limit price from the order
+            book instead of applying max_limit_order_price_diff.
         buy_bid_level:
           type: string
-          description: Buy-side bid book level. String.
+          description: Order-book bid level for copied buy limit orders in `bid` mode.
+            Positive integer string; `1` selects the best bid price.
         buy_ask_level:
           type: string
-          description: Buy-side ask book level. String.
+          description: Order-book ask level for copied buy limit orders in `ask` mode.
+            Positive integer string; `1` selects the best ask price.
         use_sell_order_book:
           type: boolean
-          description: Whether sell copy uses order-book level settings.
+          description: Whether to select the copied sell limit price from the order
+            book instead of applying sell_limit_order_price_diff.
         sell_bid_level:
           type: string
-          description: Sell-side bid book level. String.
+          description: Order-book bid level for copied sell limit orders in `bid`
+            mode. Positive integer string; `1` selects the best bid price.
         sell_ask_level:
           type: string
-          description: Sell-side ask book level. String.
+          description: Order-book ask level for copied sell limit orders in `ask`
+            mode. Positive integer string; `1` selects the best ask price.
         buy_order_book_mode:
           type: string
-          description: Buy-side order-book mode. String.
+          description: 'Price source for copied buy limit orders when use_buy_order_book
+            is true: `bid`, `ask`, or `mid` (midpoint of best bid and ask). Bid or
+            ask mode requires its matching level only; mid accepts neither level.'
         sell_order_book_mode:
           type: string
-          description: Sell-side order-book mode. String.
+          description: 'Price source for copied sell limit orders when use_sell_order_book
+            is true: `bid`, `ask`, or `mid` (midpoint of best bid and ask). Bid or
+            ask mode requires its matching level only; mid accepts neither level.'
         turbo_mode:
           type: boolean
-          description: Whether to enable turbo mode for this config.
+          description: Whether to enable turbo mode. It bypasses buy spend caps, held-market
+            limits, market-type and keyword filters, and the 5/15-minute market-window
+            checks.
         status:
           "$ref": "#/components/schemas/CopytradeStatus"
     CopytradeMarketTypesInput:
       type: object
       required:
       - config_type
-      description: Market-type switches used by `OnlyCopyMarketsTypes`. For switch
-        fields, `1` means enabled and `2` means disabled; omitted fields are not changed.
+      description: Copytrade market-type switches. For switch fields, `1` enables
+        and `2` disables the selection. Omit fields to leave them unchanged on update.
       properties:
         all:
           type: integer
@@ -3477,131 +3650,173 @@ components:
           enum:
           - 1
           - 2
-          description: "`config_type`; `1` means an application copytrade config,
-            `2` means a template config."
+          description: Use `1` for copytrade configurations in this API. The shared
+            schema also lists `2`, but template configuration writes are not supported
+            by these endpoints.
     CopytradeConfigUpdateInput:
       type: object
       properties:
         target_address:
           type: string
-          description: Optional on PATCH. Trader wallet address to follow; when omitted
-            the existing target address is not changed.
+          description: Trader wallet address to follow.
         tag:
           type: string
-          description: User-visible label for this copytrade config.
+          description: User-visible label for this copytrade configuration.
         copy_percentage:
           type: string
-          description: Percentage of the trader's order size to copy. Decimal string;
+          description: Percentage of the source buy amount to copy, expressed as a
+            decimal string; `50` means 50%. A positive copy_fixed_amount takes precedence.
         limit_order_copy:
           type: boolean
-          description: Whether to copy buy limit orders. On PATCH, specify the desired
-            final state.
+          description: Whether copied buys use limit orders; false selects market
+            orders. On PATCH, specify the desired final state.
         limit_order_validity_period:
           type: string
-          description: Validity period for copied buy limit orders. Decimal/integer
-            string.
+          description: Buy limit-order lifetime in seconds, expressed as a string.
+            A positive value sets an expiration; without a positive value the order
+            remains good until cancelled. On PATCH, omit this field or send an empty
+            string to keep the existing lifetime. Send `"0"` or `"-1"` to remove the
+            expiration.
         max_limit_order_price_diff:
           type: string
-          description: Maximum allowed price difference for copied buy limit orders.
-            Decimal string.
+          description: Price offset added to the copied buy price when order-book
+            pricing is disabled. An absolute decimal price difference, not a percentage.
         max_token_spend:
           type: string
-          description: Maximum token spend cap for this config. Decimal string.
+          description: Maximum buy spend per outcome token, in USD, for this configuration.
+            A positive value enables the limit; turbo mode bypasses it.
         total_token_spend:
           type: string
-          description: Total token spend cap for this config. Decimal string.
+          description: Maximum total buy spend in USD for this configuration, not
+            the amount already spent. A positive value enables the limit; turbo mode
+            bypasses it.
         buy_at_min:
           type: boolean
-          description: Whether buy copy should use minimum-price behavior.
+          description: Whether to raise a copied buy to the applicable minimum order
+            amount or share quantity when it would otherwise be too small. On PATCH,
+            specify the desired final state.
         copy_fixed_amount:
           type: string
-          description: Fixed amount to copy per trade. Decimal string.
+          description: Fixed buy amount in USD, expressed as a decimal string. A positive
+            value takes precedence over percentage sizing and per-trade sizing bounds.
         min_trader_trade_amount:
           type: string
-          description: Minimum source trader trade amount required before copying.
-            Decimal string.
+          description: Minimum source buy value in USD eligible for copying. Decimal
+            string.
         max_trader_trade_amount:
           type: string
-          description: Maximum source trader trade amount allowed for copying. Decimal
+          description: Maximum source buy value in USD eligible for copying. Decimal
             string.
         min_copy_amount_per_trade:
           type: string
-          description: Minimum copied amount per trade. Decimal string.
+          description: Minimum copied buy amount in USD for percentage-based sizing.
+            Not applied when copy_fixed_amount is positive.
         max_copy_amount_per_trade:
           type: string
-          description: Maximum copied amount per trade. Decimal string.
+          description: Maximum copied buy amount in USD for percentage-based sizing.
+            Not applied when copy_fixed_amount is positive.
         min_price:
           type: string
-          description: Minimum market/order price allowed for copying. Decimal string.
+          description: Minimum outcome-token price eligible for copied buys. Decimal
+            string.
         max_price:
           type: string
-          description: Maximum market/order price allowed for copying. Decimal string.
+          description: Maximum outcome-token price eligible for copied buys. Decimal
+            string.
         slippage:
           type: string
-          description: Buy-side market-order slippage tolerance. Decimal string.
+          description: Buy market-order slippage percentage, expressed as a decimal
+            string; `2` means 2%.
         max_spend_per_market:
           type: string
-          description: Maximum spend cap per market. Decimal string.
+          description: Maximum buy spend per market in USD for this configuration.
+            A positive value enables the limit; turbo mode bypasses it.
         max_holder_market_number:
           type: string
-          description: Maximum number of holder markets allowed. Integer string.
+          description: Maximum number of markets held by this configuration. Positive
+            integer string; turbo mode bypasses this limit.
         take_profit_percentage:
           type: string
-          description: Take-profit trigger percentage. Decimal string.
+          description: Take-profit increase from the entry price, in percent; `10`
+            means 10%. A positive take_profit_price takes precedence.
         take_profit_price:
           type: string
-          description: Take-profit trigger price. Decimal string.
+          description: Absolute outcome-token price that triggers take profit. Decimal
+            string; a positive value takes precedence over take_profit_percentage.
         stop_loss_percentage:
           type: string
-          description: Stop-loss trigger percentage. Decimal string.
+          description: Stop-loss decrease from the entry price, in percent; `10` means
+            10%. A positive stop_loss_price takes precedence.
         stop_loss_price:
           type: string
-          description: Stop-loss trigger price. Decimal string.
+          description: Absolute outcome-token price that triggers stop loss. Decimal
+            string; a positive value takes precedence over stop_loss_percentage.
         copy_buy:
           type: boolean
-          description: Whether buy trades are copied. On PATCH, specify the desired
+          description: Whether to copy source buy trades. On PATCH, specify the desired
             final state.
         copy_sell:
           type: boolean
-          description: Whether sell trades are copied. On PATCH, specify the desired
+          description: Whether to copy source sell trades. On PATCH, specify the desired
             final state.
         market_sell_slippage:
           type: string
-          description: Sell-side market-order slippage tolerance. Decimal string.
+          description: Sell market-order slippage percentage, expressed as a decimal
+            string; `2` means 2%.
         sell_limit_order_copy:
           type: boolean
-          description: Whether to copy sell limit orders. On PATCH, specify the desired
-            final state.
+          description: Whether copied sells use limit orders; false selects market
+            orders. On PATCH, specify the desired final state.
         sell_limit_order_price_diff:
           type: string
-          description: Maximum allowed price difference for copied sell limit orders.
-            Decimal string.
+          description: Price offset added to the copied sell price when order-book
+            pricing is disabled. An absolute decimal price difference, not a percentage.
         sell_limit_order_validity_period:
           type: string
-          description: Validity period for copied sell limit orders. Decimal/integer
-            string.
+          description: Sell limit-order lifetime in seconds, expressed as a string.
+            A positive value sets an expiration; without a positive value the order
+            remains good until cancelled. On PATCH, omit this field or send an empty
+            string to keep the existing lifetime. Send `"0"` or `"-1"` to remove the
+            expiration.
         max_5m_market_start_time:
           type: string
-          description: Earliest allowed start-time window for 5-minute markets. String.
+          description: Copy buys in 5-minute Up/Down markets within this many seconds
+            after the market opens. Positive integer string. If both start and end
+            windows are positive, either window permits copying. If neither is positive,
+            no time-window restriction applies. Turbo mode bypasses this check.
         max_5m_market_end_time:
           type: string
-          description: Latest allowed end-time window for 5-minute markets. String.
+          description: Copy buys in 5-minute Up/Down markets within this many seconds
+            before the market closes. Positive integer string. If both start and end
+            windows are positive, either window permits copying. If neither is positive,
+            no time-window restriction applies. Turbo mode bypasses this check.
         max_15m_market_start_time:
           type: string
-          description: Earliest allowed start-time window for 15-minute markets. String.
+          description: Copy buys in 15-minute Up/Down markets within this many seconds
+            after the market opens. Positive integer string. If both start and end
+            windows are positive, either window permits copying. If neither is positive,
+            no time-window restriction applies. Turbo mode bypasses this check.
         max_15m_market_end_time:
           type: string
-          description: Latest allowed end-time window for 15-minute markets. String.
+          description: Copy buys in 15-minute Up/Down markets within this many seconds
+            before the market closes. Positive integer string. If both start and end
+            windows are positive, either window permits copying. If neither is positive,
+            no time-window restriction applies. Turbo mode bypasses this check.
         tp_balance_threshold:
           type: string
-          description: Balance threshold used by take-profit logic. Decimal string.
+          description: Account-value threshold for pausing this configuration when
+            the value is at or above it. Account value includes available trading
+            balance and position value. Decimal amount.
         sl_balance_threshold:
           type: string
-          description: Balance threshold used by stop-loss logic. Decimal string.
+          description: Account-value threshold for pausing this configuration when
+            the value is at or below it. Account value includes available trading
+            balance and position value. Decimal amount.
         reverse_copy:
           type: boolean
-          description: Whether to invert copied trade direction. On PATCH, specify
-            the desired final state.
+          description: Whether to copy the opposite market outcome. This changes the
+            outcome token, not the buy/sell side. On PATCH, specify the desired final
+            state.
         keyword_whitelist:
           description: Not accepted on PATCH. Use POST `/copytrade/configs/{config_id}/keywords`.
           readOnly: true
@@ -3616,38 +3831,53 @@ components:
             type: string
         failure_retry:
           type: string
-          description: Retry count/strategy value used after copy failure. String.
+          description: Number of retries after an eligible copy-order failure, expressed
+            as an integer string. Execution limits retries to at most 3.
         limit_expired_to_market:
           type: boolean
-          description: Whether expired copied limit orders may fall back to market
-            orders.
+          description: Whether an expired copied limit order may be retried as a market
+            order. On PATCH, specify the desired final state.
         use_buy_order_book:
           type: boolean
-          description: Whether buy copy uses order-book level settings.
+          description: Whether to select the copied buy limit price from the order
+            book instead of applying max_limit_order_price_diff. On PATCH, specify
+            the desired final state.
         buy_bid_level:
           type: string
-          description: Buy-side bid book level. String.
+          description: Order-book bid level for copied buy limit orders in `bid` mode.
+            Positive integer string; `1` selects the best bid price.
         buy_ask_level:
           type: string
-          description: Buy-side ask book level. String.
+          description: Order-book ask level for copied buy limit orders in `ask` mode.
+            Positive integer string; `1` selects the best ask price.
         use_sell_order_book:
           type: boolean
-          description: Whether sell copy uses order-book level settings.
+          description: Whether to select the copied sell limit price from the order
+            book instead of applying sell_limit_order_price_diff. On PATCH, specify
+            the desired final state.
         sell_bid_level:
           type: string
-          description: Sell-side bid book level. String.
+          description: Order-book bid level for copied sell limit orders in `bid`
+            mode. Positive integer string; `1` selects the best bid price.
         sell_ask_level:
           type: string
-          description: Sell-side ask book level. String.
+          description: Order-book ask level for copied sell limit orders in `ask`
+            mode. Positive integer string; `1` selects the best ask price.
         buy_order_book_mode:
           type: string
-          description: Buy-side order-book mode. String.
+          description: 'Price source for copied buy limit orders when use_buy_order_book
+            is true: `bid`, `ask`, or `mid` (midpoint of best bid and ask). Bid or
+            ask mode requires its matching level only; mid accepts neither level.'
         sell_order_book_mode:
           type: string
-          description: Sell-side order-book mode. String.
+          description: 'Price source for copied sell limit orders when use_sell_order_book
+            is true: `bid`, `ask`, or `mid` (midpoint of best bid and ask). Bid or
+            ask mode requires its matching level only; mid accepts neither level.'
         turbo_mode:
           type: boolean
-          description: Whether to enable turbo mode for this config.
+          description: Whether to enable turbo mode. It bypasses buy spend caps, held-market
+            limits, market-type and keyword filters, and the 5/15-minute market-window
+            checks. On PATCH, specify the desired final state.
         status:
           "$ref": "#/components/schemas/CopytradeStatus"
     CopytradeKeywordInput:
@@ -3741,7 +3971,9 @@ components:
           description: Market identifier or market group configured for the AFK strategy.
         period:
           type: integer
-          description: Trading period/window value.
+          description: Configured period in seconds. The trading round duration is
+            selected by market; changing period alone does not select a different
+            market duration.
         side:
           type: integer
           enum:
@@ -3751,26 +3983,33 @@ components:
         time_start_sec:
           type: integer
           format: int64
-          description: Start time in Unix seconds.
+          description: Configured earliest entry time in seconds after the start of
+            each market round, inclusive. This is a relative offset, not a Unix timestamp.
         time_end_sec:
           type: integer
           format: int64
-          description: End time in Unix seconds.
+          description: Configured entry cutoff in seconds after the start of each
+            market round, exclusive. A stored value at or below zero, or beyond the
+            round duration, uses the end of the round. This is not a Unix timestamp.
         min_price:
           type: string
-          description: Minimum allowed price. Decimal string.
+          description: Minimum outcome-token price allowed for entry. Decimal string.
         max_price:
           type: string
-          description: Maximum allowed price. Decimal string.
+          description: Maximum outcome-token price allowed for entry. Decimal string.
         price_delta_min:
           type: string
-          description: Minimum price delta filter. Decimal string.
+          description: Minimum change in the underlying cryptocurrency price since
+            the round opened (current price minus opening price). An absolute price
+            difference, not a percentage.
         price_delta_max:
           type: string
-          description: Maximum price delta filter. Decimal string.
+          description: Maximum change in the underlying cryptocurrency price since
+            the round opened (current price minus opening price). An absolute price
+            difference, not a percentage.
         buy_amount:
           type: string
-          description: Buy amount per AFK order. Decimal string.
+          description: Buy amount per AFK order in USD. Decimal string.
         limit_price:
           type: string
           description: Limit order price when `limit_order_copy=1`. Decimal string.
@@ -3845,6 +4084,9 @@ components:
         properties:
           status:
             "$ref": "#/components/schemas/AFKStatus"
+      description: For time_start_sec and time_end_sec on PATCH, omission or `0` keeps
+        the existing value; `-1` resets it to `0`. A reset start permits entry from
+        the beginning of each round; a reset end uses the end of the round.
     AFKRecordList:
       type: object
       required:

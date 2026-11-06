@@ -4,9 +4,9 @@ sidebarTitle: "Trading integration"
 description: "Trading endpoints, response formats, permissions, and retry requirements."
 ---
 
-## Endpoints
+## Readiness, portfolio, and redemption endpoints
 
-Paths are relative to `/openapi/v1`. See the API reference for full parameters and response schemas.
+The table covers readiness, portfolio history, redemption, and auto-claim. Paths are relative to `/openapi/v1`. See the API reference for the full endpoint list, parameters, and response schemas.
 
 | Endpoint | Required user-key scope | Result |
 |---|---|---|
@@ -23,11 +23,9 @@ Closed positions and activity accept `eventId`, `sortBy`, `sortDirection`, `limi
 
 The reference also includes `GET /wallet/withdrawals/by-key` for recovering a withdrawal using its original `Idempotency-Key` header. This does not enable Partner user withdrawals.
 
-## Response data
+## Copytrade mutation responses
 
-Use the caller's API key with the required scopes. Check the readiness response before enabling trading actions.
-
-These operations return the following `data` values:
+Use the user’s API key with `copytrade:manage` for these operations. They return the following `data` values:
 
 | Operation | Success `data` |
 |---|---|

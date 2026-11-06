@@ -15,7 +15,7 @@ Send these four headers on every request:
 </ParamField>
 
 <ParamField header="X-Timestamp" type="integer" required>
-  Unix timestamp in seconds. The default allowed clock skew is 15 seconds in either direction. Deployment configuration may override it.
+  Unix timestamp in seconds. The default allowed clock skew is 15 seconds in either direction. Confirm the allowed skew for your environment with PolyCop.
 </ParamField>
 
 <ParamField header="X-Nonce" type="string" required>
@@ -50,7 +50,7 @@ Use these values:
 
 Send each scalar query parameter once. Repeated scalar keys (even with identical values), malformed percent encoding, and unescaped query semicolons return `400 BAD_REQUEST`. Parameter names are compared after decoding, so `locale` and `loc%61le` count as the same key.
 
-Only these GET array parameters accept repeated keys: `/positions`: `market`; `/closed-positions`: `market`, `eventId`; `/activity`: `market`, `eventId`, `type`. Existing CSV array values remain supported. Canonical sorting and HMAC computation are unchanged.
+Only these GET array parameters accept repeated keys: `/positions`: `market`; `/closed-positions`: `market`, `eventId`; `/activity`: `market`, `eventId`, `type`. These array parameters also accept comma-separated values.
 
 Sign the canonical string with your API secret:
 
@@ -112,7 +112,7 @@ e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
 
 The server accepts timestamps within a limited window to restrict replay:
 
-- By default, your `X-Timestamp` must be within 15 seconds of server time in either direction. Confirm any deployment override with PolyCop.
+- By default, your `X-Timestamp` must be within 15 seconds of server time in either direction. Confirm the allowed skew for your environment with PolyCop.
 - If the timestamp falls outside this window, the server rejects the request with `API_KEY_TIMESTAMP_EXPIRED`.
 - Use a time-synchronized clock source, such as NTP, on your signing host to avoid drift. Cloud environments usually synchronize automatically; embedded or local systems may require explicit NTP configuration.
 
@@ -121,7 +121,7 @@ The server accepts timestamps within a limited window to restrict replay:
 A nonce ("number used once") prevents an attacker who intercepts a valid request from replaying it:
 
 - Use a unique nonce for each request under the same API key. Changing `X-Timestamp` does not let you reuse a nonce.
-- Replaying a nonce within the timestamp window is rejected with HTTP `409` and `API_KEY_NONCE_REPLAYED`.
+- Replaying a nonce during its retention period is rejected with HTTP `409` and `API_KEY_NONCE_REPLAYED`.
 - Generate nonces using a cryptographically secure random source. For example, use 16 or more random bytes encoded as a lowercase hex string. This produces a string of at least 32 characters.
 
 <Tip>
@@ -132,13 +132,13 @@ A nonce ("number used once") prevents an attacker who intercepts a valid request
 ## Retry behaviour
 
 <Warning>
-  Generate a fresh `X-Timestamp`, `X-Nonce`, and `X-Signature` for every retry,
-  including idempotent requests. The previous timestamp may have expired, and
+  Read the current time for `X-Timestamp`, generate a new `X-Nonce`, and
+  recompute `X-Signature` for every retry, including idempotent requests. The previous timestamp may have expired, and
   the nonce may already be consumed. To retry the same write, keep its
   `Idempotency-Key` and `X-API-Key` while refreshing the three signing headers.
 </Warning>
 
-See [Idempotency](/concepts/idempotency) for guidance on retrying state-changing requests.
+For configuration and redemption requests, retries are scoped to the credential as well as the account, method, path, and idempotency key. Order creation and withdrawal retries are scoped across credentials for the same account. Keep the original credentials when recovering a request; changing credentials is not a way to resolve an unknown result. See [Idempotency](/concepts/idempotency).
 
 ## Key lifetime
 
@@ -163,7 +163,7 @@ Each API key has scopes that control which endpoints it can call. If the key doe
 | `trade:read` | Read orders |
 | `trade:order` | Place orders |
 | `trade:cancel` | Cancel orders |
-| `wallet:read` | Read wallet balances |
+| `wallet:read` | Read wallet balances and withdrawal status |
 | `withdraw:create` | Create Polygon withdrawals |
 | `positions:read` | Read open and closed positions |
 | `trading:read` | Check readiness for the current key |

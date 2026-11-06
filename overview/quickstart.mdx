@@ -12,7 +12,7 @@ Get an API key, sign a `GET /wallet` request, and check the response.
 
 <Step title="Get an API key">
 
-Contact PolyCop to receive a direct account key or a Partner Key. For a multi-user integration, follow [Partner API](/concepts/partner-api) to provision users and issue their keys before making user trading requests.
+This example requires a direct account key or a Partner user key with `wallet:read`. Contact PolyCop for a direct account key. If you have a Partner management key, first follow [Partner API](/concepts/partner-api) to create a user and issue that user’s key.
 
 Your API credentials have two parts:
 
@@ -22,7 +22,7 @@ Your API credentials have two parts:
 | `secret` | `sk_` | The private secret used to sign requests |
 
 <Warning>
-  The `secret` is shown only once. Save it in a secrets manager when you receive the response.
+  Save the `secret` from the creation response in a secrets manager. There is no separate endpoint for retrieving it. An idempotent retry of the same user-key issuance can replay the original creation response.
 </Warning>
 
 API keys have scopes such as `trade:order` and `wallet:read`. Request the scopes your integration needs. Write scopes also require a nonempty `ip_whitelist` with your backend egress IP addresses or CIDRs.
@@ -37,7 +37,7 @@ Every request must include four authentication headers. The API checks the signa
 |---|---|
 | `X-API-Key` | Your `key_id` (e.g., `pk_...`) |
 | `X-Timestamp` | Current Unix timestamp in **seconds** (integer) |
-| `X-Nonce` | A random string unique within the timestamp window |
+| `X-Nonce` | A new random string for each request under the same API key |
 | `X-Signature` | HMAC-SHA256 hex digest of the canonical string (see below) |
 
 ### Building the canonical string
@@ -83,7 +83,7 @@ function sign(method: string, path: string, query: string, body: string, secret:
 Put the returned `timestamp`, `nonce`, and `signature` values into the matching request headers.
 
 <Note>
-  Generate a fresh timestamp, nonce, and signature for each retry. The API rejects reused signing values.
+  For each retry, read the current timestamp, generate a new nonce, and recompute the signature. Requests sent in the same second may use the same timestamp.
 </Note>
 
 <Tip>
@@ -94,7 +94,7 @@ Put the returned `timestamp`, `nonce`, and `signature` values into the matching 
 
 <Step title="Make your first request: GET /wallet">
 
-With an API key and a fresh signature, call `GET /wallet`. It returns the custodial wallet linked to the API key and its balances.
+With a direct account key or Partner user key that has `wallet:read`, sign and call `GET /wallet`. It returns the custodial wallet linked to the API key and its balances.
 
 ### Request
 
@@ -128,7 +128,7 @@ A successful request returns HTTP `200`:
 }
 ```
 
-If `code` is not `OK`, compare your canonical string with the request you sent. Also check that `X-Timestamp` is current.
+If `code` is not `OK`, follow the action for that code in [Error codes](/reference/error-codes). For `API_KEY_SIGNATURE_INVALID`, compare the canonical string and body bytes with the request you sent. For `API_KEY_TIMESTAMP_EXPIRED`, check your clock.
 
 </Step>
 

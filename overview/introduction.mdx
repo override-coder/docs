@@ -20,13 +20,13 @@ The following Base URL is for the test environment only. It is not a production 
 https://test-eu.polycopy.fun/openapi/v1
 ```
 
-Append the endpoint path to this base URL for every request. For example, to call the wallet endpoint, use `https://test-eu.polycopy.fun/openapi/v1/wallet`.
+Append the endpoint path to this base URL. For example, `GET https://test-eu.polycopy.fun/openapi/v1/wallet` requires a direct account key or Partner user key with `wallet:read`. Follow the [Quickstart](/overview/quickstart) to sign this request.
 
 Use separate credentials and wallets for testing. Do not send production credentials or funds to the test environment.
 
 ## Response envelope
 
-Every response uses the same JSON envelope, whether the request succeeds or fails. Check `code` first, then read the endpoint-specific `data` field.
+API JSON responses use this envelope for success and errors. Check `code` first, then read the endpoint-specific `data` field.
 
 ```json
 {
@@ -59,7 +59,7 @@ When a request fails, `code` contains a non-`OK` value and `data` is usually `nu
 
 ```json
 {
-  "code": "UNAUTHORIZED",
+  "code": "API_KEY_SIGNATURE_INVALID",
   "message": "API key signature is invalid",
   "data": null,
   "request_id": "req_202606011200000002"

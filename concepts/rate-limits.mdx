@@ -6,13 +6,13 @@ description: "Default request limits for PolyCop OpenAPI endpoints."
 
 Each request counts toward several limits. The API rejects it if it exceeds any of them.
 
-The values below are defaults; your deployment may use different limits.
+The values below are defaults; limits for your environment may differ. Confirm them with PolyCop.
 
 ## Shared limits
 
-Global, source IP, endpoint, account, API key, and trading limits can all apply to a request. Each request counts once toward each shared limit.
+Global, source IP, endpoint, account, API key, and trading limits can all apply to a request.
 
-Global, source IP, and endpoint limits also cover unauthenticated requests and unknown routes. A request can return `429 RATE_LIMITED` before credential validation or a `404`; a `429` does not confirm that its credentials are valid. CORS preflight requests remain `204` responses.
+Rate limits also apply to unauthenticated requests. A `429 RATE_LIMITED` response does not confirm that the credentials are valid.
 
 | Bucket | Limit | Applies to |
 |---|---:|---|
@@ -27,7 +27,7 @@ Global, source IP, and endpoint limits also cover unauthenticated requests and u
 | API key | 120 requests / minute | API key id |
 | API key burst | 40 requests / 10 seconds | API key id |
 
-Unknown routes share a single endpoint bucket. Different resource IDs on the same matched route do not create separate endpoint quotas.
+Different resource IDs on the same endpoint share its limit.
 
 ## Endpoint limits
 
@@ -77,8 +77,8 @@ When a request exceeds a limit, the API returns HTTP `429` with `code=RATE_LIMIT
 | `X-RateLimit-Remaining` | Remaining requests in the current window, usually `0` |
 | `X-RateLimit-Reset` | Seconds until the current bucket resets |
 
-Use `Retry-After` when present. If it is absent, use exponential backoff with jitter; do not retry immediately. On every retry, generate a fresh timestamp, nonce, and signature. For a repeated write, keep the original API key, idempotency key, and request intent. See [Idempotency](/concepts/idempotency).
+Use `Retry-After` when present. If it is absent, use exponential backoff with jitter; do not retry immediately. On every retry, read the current timestamp, generate a new nonce, and recompute the signature. For a repeated write, keep the original API key, idempotency key, and request body. See [Idempotency](/concepts/idempotency) for each operation’s deduplication scope.
 
 ## Invalid signatures
 
-Repeated invalid signatures can return `429 RATE_LIMITED`. The default threshold is 10 failures within 10 minutes. This counter applies only to failed signatures, so it does not lock out requests with valid signatures. Source IP, account, endpoint, and nonce checks still apply. These signature-failure responses do not include the retry headers listed above.
+Repeated invalid signatures can return `429 RATE_LIMITED`. The default threshold is 10 failures within 10 minutes. Validly signed requests remain subject to the other request limits and authentication rules. These signature-failure responses do not include the retry headers listed above.

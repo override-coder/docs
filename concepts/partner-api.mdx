@@ -4,7 +4,7 @@ sidebarTitle: "Partner API"
 description: "Create a trading account for each user and trade with that user's API key."
 ---
 
-Use a Partner Key on your backend to create users and issue their API keys. Use each user's key for that user's wallet, orders, positions, and automation requests. New Partner Keys have management scopes only and cannot call trading endpoints. A legacy Partner Key that still has trading permissions operates on the partner account; passing a user account ID in the body does not change that identity.
+Use a Partner Key on your backend to create users and issue their API keys. Use each user's key for that user's wallet, orders, positions, and automation requests. New Partner Keys have management scopes only and cannot call trading endpoints.
 
 All paths below are relative to `/openapi/v1`. Sign every request using [HMAC-SHA256](/concepts/authentication).
 
@@ -55,7 +55,7 @@ Call `POST /partner/users/{user_account_id}/api-keys` with your Partner Key. Spe
 This request includes the scopes listed above. Add `copytrade:read`, `copytrade:manage`, `afk:read`, and `afk:manage` if your application uses those features.
 
 <Warning>
-  The response returns the secret only at creation. Store it encrypted on your backend immediately. Never send it to a browser, Telegram chat, or client log.
+  Store the secret from the creation response encrypted on your backend immediately. There is no separate secret-retrieval endpoint; an idempotent retry can replay the original issuance response. Never send it to a browser, Telegram chat, or client log.
 </Warning>
 
 If you omit `scopes`, the default is these five read-only permissions:
@@ -108,7 +108,7 @@ Partner user keys cannot withdraw, even if the account has 2FA. Withdrawal endpo
 
 New Partner management keys receive only `partner:users:manage` and `partner:api_keys:manage` and require an IP whitelist. Existing scopes are preserved, but every HMAC write request requires a configured whitelist. A configured whitelist also restricts reads; invalid policies and unmatched source addresses return `403 FORBIDDEN`.
 
-You can request copytrade and AFK write scopes explicitly. API keys have no trading allowance or funds budget. Keep secrets on your backend and grant only the permissions your application needs.
+You can request copytrade and AFK write scopes explicitly. API keys do not have an independent monetary spending cap. Copytrade and AFK configuration limits are separate from key permissions. Keep secrets on your backend and grant only the permissions your application needs.
 
 ## Partner key compromise
 
@@ -124,8 +124,14 @@ Every API key is limited to 180 days from creation. Normal and Partner Keys defa
 
 Store the returned `expires_at` alongside the key. Resetting a secret does not extend this deadline, and expired keys cannot be reset. Create replacement keys before expiration. An expired key returns `401 API_KEY_INVALID` on authenticated requests. Expired keys do not consume the active-key quota.
 
-Existing keys retain their original creation date for the 180-day limit. Existing user keys are also capped by the issuing parent deadline. Contact PolyCop to replace old or orphaned keys. Revoking or rotating the parent does not change the deadline stored for its user keys.
+Revoking or rotating the parent does not change the deadline stored for its user keys.
 
 Retrying key issuance with the same idempotency key returns the original result and `expires_at`. It does not renew an expired user key or create a new one. An expired parent cannot retrieve that cached response. Issue a replacement as a separate operation.
 
-Older cached issuance responses may omit `expires_at`, but those keys still expire. Confirm the deadline with the issuer or request a replacement key. Keep the original idempotency record rather than discarding it to force a new response.
+## Compatibility with older keys
+
+A legacy Partner Key with trading permissions operates on the partner account. Passing a user account ID does not make it act as that user.
+
+Existing keys retain their original creation date for the 180-day limit. Existing user keys are also capped by the issuing parent deadline. Contact PolyCop if you need help replacing an older key.
+
+Older issuance responses may omit `expires_at`, but those keys still expire. Confirm the deadline with PolyCop or issue a replacement as a separate operation with a new idempotency key.

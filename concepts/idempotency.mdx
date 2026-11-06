@@ -4,7 +4,7 @@ sidebarTitle: "Idempotency"
 description: "Use idempotency keys to retry writes and recover results when a request times out."
 ---
 
-Generate an `Idempotency-Key` before sending an operation that needs one. Save it with the exact request body. For a retry, keep that key and body, and generate a fresh `X-Timestamp`, `X-Nonce`, and `X-Signature`. Keep the same API key. See [Authentication](/concepts/authentication).
+Generate an `Idempotency-Key` before sending an operation that needs one. Save it with the exact request body. For a retry, keep that key, body, and API key; read the current timestamp, generate a new nonce, and recompute the signature. The deduplication scope differs by operation, as described below. See [Authentication](/concepts/authentication).
 
 ## Required endpoints
 
@@ -39,7 +39,7 @@ For configuration and redemption requests, the server identifies retries by acco
 
 The server checks the current key's permissions before replaying a cached response. An old cached success does not bypass revoked permissions.
 
-For generic configuration operations, completed responses are normally retained for 24 hours. Processing, unknown, and legacy failed records remain blocked instead of automatically executing again. Do not assume that a key provides indefinite deduplication after a completed record expires.
+For configuration operations, completed responses are normally retained for 24 hours. A processing or blocked operation does not execute again when retried with the same key. Do not assume that a key provides indefinite deduplication after a completed record expires.
 
 ## Handle a retry
 
@@ -78,4 +78,6 @@ See [Signing examples](/examples/signing) for helpers that send the idempotency 
 
 For user-key issuance, a cached response retains its original secret and `expires_at`. Replaying it never renews a key or changes the deadline. If the user key has expired, issue a replacement as a separate operation. An expired parent fails authentication before the server can return a cached result.
 
-Older cached issuance responses may omit `expires_at`, but those keys still expire. Confirm the deadline with the issuer or request a replacement key. Keep the original idempotency record rather than discarding it to force a new response.
+### Older issuance responses
+
+Older cached issuance responses may omit `expires_at`, but those keys still expire. Confirm the deadline with the issuer or request a replacement key. Use a new idempotency key only when intentionally issuing a replacement key as a separate operation.

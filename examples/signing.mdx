@@ -202,8 +202,8 @@ print(result)
 ```
 
 <Note>
-  Python's `hmac` module is called as `hmac.new(key, msg, digestmod)`, not
-  `hmac.HMAC(...)` directly. Pass `hashlib.sha256` as the `digestmod` argument
+  This example uses `hmac.new(key, msg, digestmod=hashlib.sha256)`. Pass
+  `hashlib.sha256` as the digest algorithm
   and call `.hexdigest()` on the result to get the lowercase hex signature
   string the server expects.
 </Note>
@@ -282,6 +282,6 @@ console.log(order);
   For `POST` requests, serialize the body with
   `JSON.stringify(body)` (TypeScript) or
   `json.dumps(body, separators=(',', ':'))` (Python) before hashing it. Send
-  those exact bytes in the HTTP body. Extra whitespace, different key ordering,
-  or a different encoding will invalidate the signature.
+  those exact bytes in the HTTP body. Changing whitespace, key ordering, or
+  encoding after hashing changes the signed bytes and invalidates the signature.
 </Tip>

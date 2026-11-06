@@ -4,7 +4,7 @@ sidebarTitle: "Error codes"
 description: "Error codes returned by the third-party PolyCop OpenAPI."
 ---
 
-Every error response includes a machine-readable `code`. Use it with the HTTP status when deciding whether to retry, fix the request, or contact support.
+API JSON error responses include a machine-readable `code`. Use it with the HTTP status when deciding whether to retry, fix the request, or contact support.
 
 ## General errors
 
@@ -18,7 +18,7 @@ Any endpoint can return these codes.
 | `FORBIDDEN` | 403 | Key type, scope, source IP policy, or account policy denies the request | Check the key permissions and source IP; this code alone does not confirm successful signature verification |
 | `NOT_FOUND` | 404 | The requested resource does not exist | Verify the resource ID |
 | `VALIDATION_FAILED` | 400 / 422 | The request body failed schema validation | Correct the invalid body fields and retry |
-| `CONFLICT` | 409 | Conflict, such as an idempotency key reused with a different body | Check your request for duplicate keys |
+| `CONFLICT` | 409 | The request conflicts with a previous operation or the current state | Check the message and current state. Preserve the original request when its result is unknown; see [Idempotency](/concepts/idempotency) |
 | `RATE_LIMITED` | 429 | Too many requests | Honor `Retry-After` when present; otherwise use exponential backoff with jitter |
 | `INTERNAL_ERROR` | 500 | Unexpected server-side error | For reads, retry with backoff; for writes, keep the original idempotency key and confirm the outcome |
 | `MASTER_UNAVAILABLE` | 502 | The service is temporarily unavailable | For reads, retry with backoff; for writes, keep the original idempotency key and confirm the outcome |
@@ -45,8 +45,7 @@ Check your credentials and signing logic when you receive one of these codes.
 | `API_KEY_NONCE_REPLAYED` | 409 | The same API key has already used this nonce during its retention period | Generate a new cryptographically random nonce for every request |
 
 <Warning>
-  `API_KEY_SIGNATURE_INVALID` is the most common integration error. The usual
-  causes are using the short path, such as `/wallet`, instead of the full path,
+  `API_KEY_SIGNATURE_INVALID` can result from using the short path, such as `/wallet`, instead of the full path,
   such as `/openapi/v1/wallet`; hashing a body that differs from the exact bytes
   sent over HTTP; or using escaped `\n` characters instead of real newline
   bytes. See [Signing examples](/examples/signing) for reference
@@ -98,7 +97,7 @@ Use these codes to check withdrawal parameters or investigate a failed request.
 | `WITHDRAW_NETWORK_UNSUPPORTED` | 400 | The specified network is not supported | Only Polygon (`polygon`) is supported in v1 |
 | `WITHDRAW_TOKEN_UNSUPPORTED` | 422 | The token contract address is not supported | Use one of the four supported token contract addresses listed in the API reference |
 | `WITHDRAW_ADDRESS_INVALID` | 422 | The destination address is not a valid Polygon address | Verify the address format (EIP-55 checksummed or lowercase hex) |
-| `WITHDRAW_AMOUNT_INVALID` | 422 | The withdrawal amount is invalid or below the minimum | Check the amount format and minimum withdrawal threshold |
+| `WITHDRAW_AMOUNT_INVALID` | 422 | The withdrawal amount is invalid or below the minimum | Check the decimal amount and the error message; contact PolyCop if the applicable minimum is unclear |
 | `WITHDRAW_CREATE_FAILED` | 500 | The API could not complete the withdrawal request | Preserve the original key and check recovery state before further action |
 | `WITHDRAW_NOT_FOUND` | 404 | The withdrawal ID was not found | Verify your `withdraw_id` value |
 | `WITHDRAW_RESULT_UNKNOWN` | 502 / 503 | The withdrawal result cannot be confirmed | Query `GET /wallet/withdrawals/by-key` with the original `Idempotency-Key`; use the ID lookup if known |
@@ -131,7 +130,7 @@ Partner user creation and API key issuance can return the following code.
 
 ## Rate limiting
 
-When you exceed a rate limit, the server returns HTTP `429` with the code `RATE_LIMITED`. Bucket-based rejections include headers that tell you when to retry. Signature-failure throttling can return the same code without these headers. Pre-authentication limits can return `429` before credential validation or an unknown-route `404`. See [Rate limits](/concepts/rate-limits) for the per-endpoint limits.
+When you exceed a rate limit, the server returns HTTP `429` with the code `RATE_LIMITED`. Bucket-based rejections include headers that tell you when to retry. Signature-failure throttling can return the same code without these headers. A `429` can occur before credential validation and does not confirm that the credentials are valid. See [Rate limits](/concepts/rate-limits) for the per-endpoint limits.
 
 | Header | Description |
 |---|---|
