@@ -1,0 +1,131 @@
+---
+title: "Partner API"
+sidebarTitle: "Partner API"
+description: "Create a trading account for each user and trade with that user's API key."
+---
+
+Use a Partner Key on your backend to create users and issue their API keys. Use each user's key for that user's wallet, orders, positions, and automation requests. New Partner Keys have management scopes only and cannot call trading endpoints. A legacy Partner Key that still has trading permissions operates on the partner account; passing a user account ID in the body does not change that identity.
+
+All paths below are relative to `/openapi/v1`. Sign every request using [HMAC-SHA256](/concepts/authentication).
+
+## Partner key requirements
+
+PolyCop issues Partner Keys to approved partners. Keep the key and secret on your backend.
+
+| Operation | Required scope |
+|---|---|
+| `GET /partner/users` | `partner:users:manage` or `*` |
+| `POST /partner/users` | `partner:users:manage` or `*` |
+| `POST /partner/users/{user_account_id}/api-keys` | `partner:api_keys:manage` or `*` |
+| `DELETE /partner/users/{user_account_id}/api-keys/{key_id}` | `partner:api_keys:manage` or `*` |
+
+The `*` alternative applies only to legacy Partner Keys. New keys reject wildcard scopes.
+
+## Create or recover a user
+
+Call `POST /partner/users` with a stable ID from your system:
+
+```json
+{
+  "external_user_id": "customer_1001",
+  "display_name": "Alice"
+}
+```
+
+Send the same `external_user_id` under the same partner to retrieve the existing account. Store `data.user_account_id` as a string. For a new user, PolyCop creates a trading account and custodial wallet. This endpoint cannot connect an existing wallet or sign in to an existing PolyCop account.
+
+Check `data.wallet_status` before issuing a key. It must be `ready`. If it is `pending` or `failed`, call `POST /partner/users` again with the same external ID to retry wallet initialization. Keep that ID when retrying so you do not create another account for the same person.
+
+## Issue a user API key
+
+Call `POST /partner/users/{user_account_id}/api-keys` with your Partner Key. Specify the scopes your application needs:
+
+```json
+{
+  "ip_whitelist": ["203.0.113.10/32"],
+  "name": "customer-trading",
+  "scopes": [
+    "wallet:read", "trade:read", "trade:order", "trade:cancel",
+    "positions:read", "trading:read", "activity:read",
+    "positions:redeem", "settings:read", "settings:manage"
+  ]
+}
+```
+
+This request includes the scopes listed above. Add `copytrade:read`, `copytrade:manage`, `afk:read`, and `afk:manage` if your application uses those features.
+
+<Warning>
+  The response returns the secret only at creation. Store it encrypted on your backend immediately. Never send it to a browser, Telegram chat, or client log.
+</Warning>
+
+If you omit `scopes`, the default is these five read-only permissions:
+
+```json
+[
+  "trade:read", "wallet:read", "positions:read",
+  "copytrade:read", "afk:read"
+]
+```
+
+Request `trading:read`, `activity:read`, `positions:redeem`, `settings:read`, and `settings:manage` explicitly when you need them. Existing keys do not gain them automatically. `positions:read` also permits closed-position queries.
+
+New keys of every type reject `*`. User API keys also reject `withdraw:create`. Write scopes require an explicit, nonempty `ip_whitelist` of your backend egress IP addresses or CIDRs. Replace the documentation address above with your actual source address. The user key uses the `ip_whitelist` supplied in this request; it does not inherit the Partner Key whitelist. To change scopes, issue a replacement key with the permissions you need, verify it, then revoke the old key. The API has no endpoint for changing an existing key's scopes, and account key-count limits still apply.
+
+## Run the user's trading flow
+
+1. Authenticate the person in your application and select their stored user key on your backend.
+2. Call `GET /wallet` to read wallet addresses and balances. Fund the returned wallet through your supported Polygon funding flow; the Partner API does not create a deposit transaction.
+3. Call `GET /trading/readiness` with `trading:read` to check account readiness and permissions before enabling actions.
+4. Use `/orders` to place, list, inspect, and cancel orders. Use `/positions`, `/closed-positions`, and `/activity` for portfolio views.
+5. Use `/copytrade` and `/afk` endpoints for automation. Use `/positions/redeem` and `/settings/auto-claim` for redemption features when enabled.
+6. Include the required [idempotency key](/concepts/idempotency) on writes. Save the key and request before sending them.
+
+The readiness response checks the account state and the current key's scopes and IP policy. An empty whitelist disables write capabilities and adds `API_KEY_IP_WHITELIST_REQUIRED`. A user key always has `can_withdraw=false`. `API_KEY_SCOPE_REQUIRED` indicates a missing permission; `USER_API_KEY_WITHDRAW_DISABLED` indicates the user-key withdrawal restriction. `can_view_markets` describes public market viewing, not an extra permission grant.
+
+## Use your Telegram bot
+
+You can run this flow in your own Telegram bot. Map each authenticated Telegram user to a stable `external_user_id` in your system, and keep Partner and user credentials on your backend. Opening a bot link does not grant API access or connect an existing account.
+
+This Partner flow does not require opening the PolyCop bot. Connecting an existing PolyCop account or wallet through Telegram requires a separate account-linking design and is outside these endpoints.
+
+## List and manage users
+
+Call `GET /partner/users?limit=50` to list your users. Read `data.items` and use `data.next_cursor` as the next request's `cursor` until it is absent or `null`. Results include user IDs, wallet state and addresses, creation time, and recent activity; they do not include secrets.
+
+Revoke a user key with:
+
+```text
+DELETE /partner/users/{user_account_id}/api-keys/{key_id}
+```
+
+You can revoke only user keys issued by your partner account. This endpoint cannot revoke another partner's keys or direct user keys.
+
+## Withdrawal boundary
+
+Partner user keys cannot withdraw, even if the account has 2FA. Withdrawal endpoints in the API reference apply to eligible non-user keys with `withdraw:create` and account-level 2FA. Telegram accounts are also currently blocked from withdrawal. Keep withdrawals disabled for Partner users, even though the API reference lists withdrawal endpoints.
+
+## Key permissions
+
+New Partner management keys receive only `partner:users:manage` and `partner:api_keys:manage` and require an IP whitelist. Existing scopes are preserved, but every HMAC write request requires a configured whitelist. A configured whitelist also restricts reads; invalid policies and unmatched source addresses return `403 FORBIDDEN`.
+
+You can request copytrade and AFK write scopes explicitly. API keys have no trading allowance or funds budget. Keep secrets on your backend and grant only the permissions your application needs.
+
+## Partner key compromise
+
+A Partner Key with `partner:api_keys:manage` can issue new keys for its own active, wallet-ready users without their existing secrets or further approval from those users. It can grant the allowed trading scopes even when the Partner Key itself has management scopes only. It cannot issue keys for another partner's users or grant `withdraw:create` to user keys.
+
+If an attacker obtains the Partner Key ID and secret and can pass its source IP policy, they may issue user keys and trade as those users. They can choose the new user keys' IP whitelists. Managed users are at risk even if the stolen Partner Key has only management scopes.
+
+Revoking a Partner Key does not revoke its user keys. This lets you rotate the parent key separately. If a key leaks, contact PolyCop to freeze the Partner account and revoke its Partner and user keys. Replacing the parent credential alone does not revoke previously issued user keys. A freeze blocks future authentication, but in-flight orders and running automation can continue. Work with PolyCop to check order outcomes and stop active strategies. Account freezing is not available through this public API.
+
+## Key expiration and rotation
+
+Every API key is limited to 180 days from creation. Normal and Partner Keys default to 180 days. A user key defaults to the earlier of its issuing Partner Key deadline and its own 180-day limit. You can supply an earlier RFC3339 `expires_at` when requesting a user key. A past deadline or one beyond either limit returns `400 VALIDATION_FAILED`.
+
+Store the returned `expires_at` alongside the key. Resetting a secret does not extend this deadline, and expired keys cannot be reset. Create replacement keys before expiration. An expired key returns `401 API_KEY_INVALID` on authenticated requests. Expired keys do not consume the active-key quota.
+
+Existing keys retain their original creation date for the 180-day limit. Existing user keys are also capped by the issuing parent deadline. Contact PolyCop to replace old or orphaned keys. Revoking or rotating the parent does not change the deadline stored for its user keys.
+
+Retrying key issuance with the same idempotency key returns the original result and `expires_at`. It does not renew an expired user key or create a new one. An expired parent cannot retrieve that cached response. Issue a replacement as a separate operation.
+
+Older cached issuance responses may omit `expires_at`, but those keys still expire. Confirm the deadline with the issuer or request a replacement key. Keep the original idempotency record rather than discarding it to force a new response.

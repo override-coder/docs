@@ -1,0 +1,287 @@
+---
+title: "Request signing examples: TypeScript, Python, cURL"
+sidebarTitle: "Signing examples"
+description: "HMAC-SHA256 signing examples in TypeScript, Python, and Bash."
+---
+
+<Note>All URLs and examples on this page use the test environment, not production. Use test credentials and wallets.</Note>
+
+The examples below sign a `GET /wallet` request in TypeScript, Python, and Bash. Each builds a canonical string and an HMAC-SHA256 signature. The helpers encode and sort query keys and values, including repeated values, and send the same body bytes they hash.
+
+## TypeScript / Node.js
+
+Use native `fetch` to send the request with all four authentication headers.
+
+```typescript
+import crypto from 'crypto';
+
+const BASE_URL = 'https://test-eu.polycopy.fun/openapi/v1';
+
+// Encode before sorting. Values may repeat under one key.
+function canonicalQuery(params: Record<string, string | string[]> = {}): string {
+  const encode = (value: string) => encodeURIComponent(value).replace(
+    /[!'()*]/g, c => '%' + c.charCodeAt(0).toString(16).toUpperCase()
+  );
+  return Object.entries(params)
+    .map(([key, value]) => [encode(key), (Array.isArray(value) ? value : [value]).map(encode).sort()] as const)
+    .sort(([a], [b]) => a < b ? -1 : a > b ? 1 : 0)
+    .flatMap(([key, values]) => values.map(value => `${key}=${value}`))
+    .join('&');
+}
+
+/**
+ * Build the canonical string and return the three signing artifacts.
+ * The canonical string is:
+ *   METHOD\nPATH\nQUERY\nTIMESTAMP\nNONCE\nBODY_HASH
+ */
+function sign(
+  method: string,
+  path: string,
+  query: string,
+  body: string,
+  secret: string
+): { timestamp: string; nonce: string; signature: string } {
+  const timestamp = Math.floor(Date.now() / 1000).toString();
+  const nonce = crypto.randomBytes(16).toString('hex');
+  const bodyHash = crypto.createHash('sha256').update(body, 'utf8').digest('hex');
+  const canonical = [method.toUpperCase(), path, query, timestamp, nonce, bodyHash].join('\n');
+  const signature = crypto
+    .createHmac('sha256', secret)
+    .update(canonical, 'utf8')
+    .digest('hex');
+  return { timestamp, nonce, signature };
+}
+
+/**
+ * Make an authenticated request to the PolyCop OpenAPI.
+ *
+ * @param keyId    Your API key ID  (X-API-Key header)
+ * @param secret   Your API secret  (used to sign the request)
+ * @param method   HTTP method, e.g. "GET" or "POST"
+ * @param endpoint Path relative to /openapi/v1, e.g. "/wallet"
+ * @param params   Optional query-string parameters
+ * @param body     Optional JSON request body
+ */
+async function apiRequest(
+  keyId: string,
+  secret: string,
+  method: string,
+  endpoint: string,
+  params?: Record<string, string | string[]>,
+  body?: object,
+  idempotencyKey?: string
+): Promise<unknown> {
+  const query = canonicalQuery(params);
+  const bodyStr = body !== undefined ? JSON.stringify(body) : '';
+  const url = `${BASE_URL}${endpoint}${query ? '?' + query : ''}`;
+
+  const { timestamp, nonce, signature } = sign(
+    method,
+    `/openapi/v1${endpoint}`,
+    query,
+    bodyStr,
+    secret
+  );
+
+  const headers: Record<string, string> = {
+    'X-API-Key': keyId,
+    'X-Timestamp': timestamp,
+    'X-Nonce': nonce,
+    'X-Signature': signature,
+  };
+  if (bodyStr) headers['Content-Type'] = 'application/json';
+  if (idempotencyKey) headers['Idempotency-Key'] = idempotencyKey;
+
+  const res = await fetch(url, { method, headers, body: bodyStr || undefined });
+  return res.json();
+}
+
+// Example: fetch your wallet
+const KEY_ID = 'pk_your_key_id';
+const SECRET = 'sk_your_secret';
+
+apiRequest(KEY_ID, SECRET, 'GET', '/wallet').then(console.log);
+```
+
+<Note>
+  The `path` argument passed to `sign()` must be the full path including the
+  `/openapi/v1` prefix, for example `/openapi/v1/wallet`, even though
+  `endpoint` is the short form `/wallet`. The server uses the full path when
+  it verifies your signature.
+</Note>
+
+## Python
+
+Use Python's standard library to sign the request and `requests` to send it.
+
+```python
+import hashlib
+import hmac
+import time
+import secrets
+import json
+from urllib.parse import quote
+import requests
+
+BASE_URL = 'https://test-eu.polycopy.fun/openapi/v1'
+
+
+def canonical_query(params: dict | None = None) -> str:
+    pairs = []
+    for key, values in (params or {}).items():
+        for value in values if isinstance(values, list) else [values]:
+            text = str(value).lower() if isinstance(value, bool) else str(value)
+            pairs.append((quote(str(key), safe='~'), quote(text, safe='~')))
+    return '&'.join(f'{key}={value}' for key, value in sorted(pairs))
+
+
+def sign(
+    method: str,
+    path: str,
+    query: str,
+    body: str,
+    secret: str,
+) -> tuple[str, str, str]:
+    """Return (timestamp, nonce, signature) for the given request parameters."""
+    timestamp = str(int(time.time()))
+    nonce = secrets.token_hex(16)
+    body_hash = hashlib.sha256(body.encode('utf-8')).hexdigest()
+    canonical = '\n'.join([method.upper(), path, query, timestamp, nonce, body_hash])
+    signature = hmac.new(
+        secret.encode('utf-8'),
+        canonical.encode('utf-8'),
+        hashlib.sha256,
+    ).hexdigest()
+    return timestamp, nonce, signature
+
+
+def api_request(
+    key_id: str,
+    secret: str,
+    method: str,
+    endpoint: str,
+    params: dict | None = None,
+    body: dict | None = None,
+    idempotency_key: str | None = None,
+):
+    """Make an authenticated request to the PolyCop OpenAPI."""
+    query = canonical_query(params)
+    body_str = json.dumps(body, separators=(',', ':')) if body is not None else ''
+    url = f'{BASE_URL}{endpoint}' + (f'?{query}' if query else '')
+
+    timestamp, nonce, signature = sign(
+        method, f'/openapi/v1{endpoint}', query, body_str, secret
+    )
+
+    headers = {
+        'X-API-Key': key_id,
+        'X-Timestamp': timestamp,
+        'X-Nonce': nonce,
+        'X-Signature': signature,
+    }
+    if body_str:
+        headers['Content-Type'] = 'application/json'
+    if idempotency_key:
+        headers['Idempotency-Key'] = idempotency_key
+
+    response = requests.request(
+        method,
+        url,
+        headers=headers,
+        data=body_str.encode('utf-8') if body_str else None,
+    )
+    return response.json()
+
+
+# Example: fetch your wallet
+KEY_ID = 'pk_your_key_id'
+SECRET = 'sk_your_secret'
+
+result = api_request(KEY_ID, SECRET, 'GET', '/wallet')
+print(result)
+```
+
+<Note>
+  Python's `hmac` module is called as `hmac.new(key, msg, digestmod)`, not
+  `hmac.HMAC(...)` directly. Pass `hashlib.sha256` as the `digestmod` argument
+  and call `.hexdigest()` on the result to get the lowercase hex signature
+  string the server expects.
+</Note>
+
+## cURL (Bash)
+
+cURL cannot compute the HMAC signature by itself. This script uses `openssl` to build the signature, then sends the request with `curl`.
+
+```bash
+#!/usr/bin/env bash
+# Requires: openssl, curl
+# Usage: bash sign_request.sh
+
+KEY_ID="pk_your_key_id"
+SECRET="sk_your_secret"
+METHOD="GET"
+REQUEST_PATH="/openapi/v1/wallet"
+QUERY=""
+BODY=""
+
+# 1. Generate timestamp and nonce
+TIMESTAMP=$(date +%s)
+NONCE=$(openssl rand -hex 16)
+
+# 2. Hash the request body (empty string for GET requests)
+BODY_HASH=$(printf '%s' "$BODY" | openssl dgst -sha256 | awk '{print $2}')
+
+# 3. Build the canonical string with literal newlines using printf
+CANONICAL=$(printf '%s\n%s\n%s\n%s\n%s\n%s' \
+  "$METHOD" "$REQUEST_PATH" "$QUERY" "$TIMESTAMP" "$NONCE" "$BODY_HASH")
+
+# 4. Sign the canonical string
+SIGNATURE=$(printf '%s' "$CANONICAL" | openssl dgst -sha256 -hmac "$SECRET" | awk '{print $2}')
+
+# 5. Send the request
+curl -s -X GET "https://test-eu.polycopy.fun/openapi/v1/wallet" \
+  -H "X-API-Key: ${KEY_ID}"      \
+  -H "X-Timestamp: ${TIMESTAMP}" \
+  -H "X-Nonce: ${NONCE}"         \
+  -H "X-Signature: ${SIGNATURE}"
+```
+
+<Warning>
+  You must build the canonical string with literal newline characters, not
+  the two-character escape sequence `\n`. The `printf '%s\n%s\n...'` form used
+  in step 3 above produces real newlines. If you use `echo` or string
+  concatenation with `\n` as text, the signature will not match and the server
+  will return `API_KEY_SIGNATURE_INVALID`.
+</Warning>
+
+<Note>
+  For `GET` requests with no body, `BODY` is an empty string and `BODY_HASH`
+  must be the SHA-256 hash of the empty string:
+  `e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855`.
+  The script above handles this automatically because `printf '%s' ""` produces
+  no output, and `openssl dgst -sha256` of empty input returns that exact hash.
+</Note>
+
+## POST example with body
+
+For a `POST` request, pass the JSON body and a saved idempotency key to `apiRequest()`. The helper serializes the body and uses those bytes for both signing and sending.
+
+```typescript
+// Save this key with your operation before submitting. Reuse it for retries.
+const idempotencyKey = crypto.randomUUID();
+// Replace the example with a valid decimal token ID from your selected market.
+const order = await apiRequest(KEY_ID, SECRET, 'POST', '/orders', undefined, {
+  asset: '123456789',
+  side: 'buy',
+  amount_usd: '10',
+}, idempotencyKey);
+console.log(order);
+```
+
+<Tip>
+  For `POST` requests, serialize the body with
+  `JSON.stringify(body)` (TypeScript) or
+  `json.dumps(body, separators=(',', ':'))` (Python) before hashing it. Send
+  those exact bytes in the HTTP body. Extra whitespace, different key ordering,
+  or a different encoding will invalidate the signature.
+</Tip>

@@ -1,0 +1,89 @@
+---
+title: "PolyCop OpenAPI: Introduction"
+sidebarTitle: "Introduction"
+description: "Connect to PolyCop with API keys and HMAC-SHA256 signatures."
+---
+
+PolyCop OpenAPI is a REST API for external developers. This documentation covers only endpoints authenticated with API key + HMAC-SHA256 signatures.
+
+The API includes wallets, orders, open and closed positions, activity, trading readiness, redemption, auto-claim settings, copytrade, AFK strategies, and partner user provisioning.
+
+<Note>
+  Start with [Partner API](/concepts/partner-api) if you serve multiple users. The [Trading integration](/concepts/api-parity) lists endpoints and client requirements.
+</Note>
+
+## Base URL
+
+The following Base URL is for the test environment only. It is not a production endpoint. Send test requests over HTTPS:
+
+```
+https://test-eu.polycopy.fun/openapi/v1
+```
+
+Append the endpoint path to this base URL for every request. For example, to call the wallet endpoint, use `https://test-eu.polycopy.fun/openapi/v1/wallet`.
+
+Use separate credentials and wallets for testing. Do not send production credentials or funds to the test environment.
+
+## Response envelope
+
+Every response uses the same JSON envelope, whether the request succeeds or fails. Check `code` first, then read the endpoint-specific `data` field.
+
+```json
+{
+  "code": "OK",
+  "message": "success",
+  "data": {},
+  "request_id": "req_202606011200000001"
+}
+```
+
+<ResponseField name="code" type="string" required>
+  A machine-readable status code. `OK` means the request succeeded. Any other value is an error, such as `UNAUTHORIZED` or `NOT_FOUND`.
+</ResponseField>
+
+<ResponseField name="message" type="string" required>
+  A human-readable description of the outcome. On success this is typically `"success"`. On error it contains a short explanation of what went wrong.
+</ResponseField>
+
+<ResponseField name="data" type="object | null" required>
+  The result for this endpoint. Errors usually return `null`.
+</ResponseField>
+
+<ResponseField name="request_id" type="string" required>
+  A unique request identifier. Include it when you contact support.
+</ResponseField>
+
+## Error format
+
+When a request fails, `code` contains a non-`OK` value and `data` is usually `null`. The `message` field gives a short explanation.
+
+```json
+{
+  "code": "UNAUTHORIZED",
+  "message": "API key signature is invalid",
+  "data": null,
+  "request_id": "req_202606011200000002"
+}
+```
+
+Use `code` together with the HTTP status. Log `request_id` with failed requests.
+
+## Key constraints
+
+Check these wallet, authentication, withdrawal, and client requirements before connecting your application.
+
+<Note>
+  The API works only with custodial wallets. PolyCop manages their private keys; you do not manage them directly.
+</Note>
+
+<Note>
+  Every API request must include `X-API-Key`, `X-Timestamp`, `X-Nonce`, and `X-Signature`. Trading operations do not require 2FA. Eligible withdrawal requests require 2FA. Partner user keys cannot withdraw.
+</Note>
+
+<Note>
+  Existing Polymarket CLOB clients need changes to work with this API. Changing the base URL alone is not enough.
+</Note>
+
+<Note>
+  In v1, you can withdraw on Polygon only. Wallet responses may also list deposit addresses. They do not enable withdrawals on other networks.
+</Note>

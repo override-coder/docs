@@ -1,0 +1,54 @@
+---
+title: "Trading integration"
+sidebarTitle: "Trading integration"
+description: "Trading endpoints, response formats, permissions, and retry requirements."
+---
+
+## Endpoints
+
+Paths are relative to `/openapi/v1`. See the API reference for full parameters and response schemas.
+
+| Endpoint | Required user-key scope | Result |
+|---|---|---|
+| `GET /trading/readiness` | `trading:read` | Account and wallet readiness, action flags, blocking reasons |
+| `GET /closed-positions` | `positions:read` | Closed-position history |
+| `GET /activity` | `activity:read` | Account activity |
+| `POST /positions/redeem` | `positions:redeem` | Redemption acknowledgement |
+| `GET /settings/auto-claim` | `settings:read` | Current `auto_claim` boolean |
+| `PUT /settings/auto-claim` | `settings:manage` | Confirmed target `auto_claim` boolean |
+
+Get a redeemable position with `GET /positions?redeemable=true`. Redemption takes its `condition_id`: `0x` followed by 64 hexadecimal characters. An `accepted` status means the request was accepted, not that an on-chain transaction succeeded. No transaction ID is returned. The auto-claim update takes a JSON boolean, for example `{"auto_claim":false}`. Both writes require `Idempotency-Key`.
+
+Closed positions and activity accept `eventId`, `sortBy`, `sortDirection`, `limit`, and `offset`. Activity also accepts `excludeDepositsWithdrawals`. Use the documented parameter names and offset pagination. Partner-user listing has its own cursor pagination.
+
+The reference also includes `GET /wallet/withdrawals/by-key` for recovering a withdrawal using its original `Idempotency-Key` header. This does not enable Partner user withdrawals.
+
+## Response data
+
+Use the caller's API key with the required scopes. Check the readiness response before enabling trading actions.
+
+These operations return the following `data` values:
+
+| Operation | Success `data` |
+|---|---|
+| Add a copytrade keyword | `{"code":""}` or `{"code":"KEYWORD_IN_BLACKLIST"}` |
+| Delete a copytrade keyword | `{}` |
+| Update copytrade market types | `{}` |
+
+The keyword's `data.code` is an advisory value, separate from the outer `code=OK`. Adding a keyword does not return a keyword ID. Use only the response fields documented here.
+
+Partner user keys cannot withdraw. See [Partner API](/concepts/partner-api) for account provisioning and supported actions.
+
+## Copytrade requests
+
+Use the user's API key when adding or deleting keywords or updating market types. These operations use the documented `/copytrade/configs/{config_id}` routes and payloads. The user's API key determines the account. A Partner Key cannot select another trading user.
+
+## Integration checklist
+
+1. Add `Idempotency-Key` to copytrade and AFK writes on all requests. See the [complete list](/concepts/idempotency). Missing required keys return HTTP `400`.
+2. Request explicit scopes when issuing user keys. New user keys default to five read-only scopes. Existing scopes remain unchanged; write access requires a configured IP whitelist. See [Partner API](/concepts/partner-api).
+3. A replayed request can return its original response format. Handle that response without starting another operation.
+4. Use the documented retry rules consistently across all clients that send writes.
+5. Verify user provisioning, wallet readiness, scope rejection, queries, same-key replay, and key revocation in your integration environment. Test redemption and auto-claim with a controlled test account before enabling them for users.
+
+Keep the original request and idempotency key when recovering a result. A timeout or `5xx` is not proof that an operation did not execute.

@@ -1,0 +1,68 @@
+---
+title: "PolyCop OpenAPI: Programmatic trading API"
+sidebarTitle: "Home"
+description: "Use API keys and HMAC-SHA256 to access wallets, orders, portfolio history, redemption, copytrade, and AFK strategies."
+---
+
+PolyCop OpenAPI is the third-party API for wallets, orders, portfolio history, redemption, copytrade, and AFK strategies. Every documented endpoint uses API key + HMAC-SHA256 authentication.
+
+<CardGroup cols={2}>
+  <Card title="Introduction" icon="book-open" href="/overview/introduction">
+    Find the base URL and learn how to read responses and errors.
+  </Card>
+  <Card title="Quickstart" icon="bolt" href="/overview/quickstart">
+    Get an API key and sign your first GET /wallet request.
+  </Card>
+  <Card title="Authentication" icon="lock" href="/concepts/authentication">
+    Build signatures with the required headers, canonical string, and timestamp.
+  </Card>
+  <Card title="Partner API" icon="users" href="/concepts/partner-api">
+    Create user accounts, issue keys with the permissions they need, and connect your Telegram bot.
+  </Card>
+  <Card title="Trading integration" icon="code" href="/concepts/api-parity">
+    Check trading endpoints, response formats, permissions, and retry requirements.
+  </Card>
+  <Card title="Rate limits" icon="gauge" href="/concepts/rate-limits">
+    Check the default limits for each public endpoint.
+  </Card>
+  <Card title="API reference" icon="code" href="/api-reference/wallet/get-wallet-and-balances">
+    Browse request and response schemas from the public OpenAPI specification.
+  </Card>
+</CardGroup>
+
+## Get started in four steps
+
+<Steps>
+  <Step title="Obtain an API key">
+    Contact PolyCop to receive an API key for your account. Store the secret immediately. It is shown only once.
+  </Step>
+  <Step title="Build your HMAC-SHA256 signature">
+    Build the canonical string from the method, path, query, timestamp, nonce, and body hash. Then sign it with your secret key using HMAC-SHA256.
+  </Step>
+  <Step title="Send your first authenticated request">
+    Call `GET /wallet` with the four required headers: `X-API-Key`, `X-Timestamp`, `X-Nonce`, and `X-Signature`.
+  </Step>
+  <Step title="Explore the full API">
+    Use the API reference for request bodies, response schemas, and error responses.
+  </Step>
+</Steps>
+
+## What you can do
+
+<CardGroup cols={3}>
+  <Card title="Wallet and withdrawals" icon="wallet" href="/api-reference/wallet/get-wallet-and-balances">
+    Read wallet balances. Eligible non-user keys can request Polygon withdrawals with 2FA.
+  </Card>
+  <Card title="Orders" icon="arrow-right-arrow-left" href="/api-reference/orders/place-an-order">
+    Place prediction market orders, check their status, and list or cancel them.
+  </Card>
+  <Card title="Positions" icon="chart-line" href="/api-reference/positions/list-account-positions">
+    Read open and closed positions and review redeemable balances.
+  </Card>
+  <Card title="Copytrade" icon="copy" href="/api-reference/copytrade/list-copytrade-configs">
+    Configure automated copy-trading with keyword and market-type filters.
+  </Card>
+  <Card title="AFK strategies" icon="robot" href="/api-reference/afk/list-afk-strategies">
+    Create rule-based automated trading strategies with technical indicators.
+  </Card>
+</CardGroup>

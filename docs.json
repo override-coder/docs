@@ -1,0 +1,179 @@
+{
+  "$schema": "https://mintlify.com/docs.json",
+  "name": "PolyCop OpenAPI",
+  "theme": "luma",
+  "colors": {
+    "primary": "#ef7025",
+    "light": "#eec9bc",
+    "dark": "#4fa1ab"
+  },
+  "favicon": "/favicon.svg",
+  "api": {
+    "openapi": "openapi.third-party.yaml",
+    "playground": {
+      "display": "interactive"
+    }
+  },
+  "navigation": {
+    "tabs": [
+      {
+        "tab": "Docs",
+        "groups": [
+          {
+            "group": "Overview",
+            "pages": [
+              "overview/introduction",
+              "overview/quickstart"
+            ]
+          },
+          {
+            "group": "Core concepts",
+            "pages": [
+              "concepts/authentication",
+              "concepts/partner-api",
+              "concepts/api-parity",
+              "concepts/rate-limits",
+              "concepts/idempotency"
+            ]
+          },
+          {
+            "group": "Code examples",
+            "pages": [
+              "examples/signing"
+            ]
+          },
+          {
+            "group": "Reference",
+            "pages": [
+              "reference/error-codes"
+            ]
+          }
+        ]
+      },
+      {
+        "tab": "API Reference",
+        "openapi": "openapi.third-party.yaml"
+      }
+    ]
+  },
+  "redirects": [
+    {
+      "source": "/api/afk/create-strategy",
+      "destination": "/api-reference/wallet/get-wallet-and-balances",
+      "permanent": true
+    },
+    {
+      "source": "/api/afk/get-strategy",
+      "destination": "/api-reference/wallet/get-wallet-and-balances",
+      "permanent": true
+    },
+    {
+      "source": "/api/afk/list-records",
+      "destination": "/api-reference/wallet/get-wallet-and-balances",
+      "permanent": true
+    },
+    {
+      "source": "/api/afk/list-strategies",
+      "destination": "/api-reference/wallet/get-wallet-and-balances",
+      "permanent": true
+    },
+    {
+      "source": "/api/afk/update-strategy",
+      "destination": "/api-reference/wallet/get-wallet-and-balances",
+      "permanent": true
+    },
+    {
+      "source": "/api/copytrade/create-config",
+      "destination": "/api-reference/wallet/get-wallet-and-balances",
+      "permanent": true
+    },
+    {
+      "source": "/api/copytrade/delete-config",
+      "destination": "/api-reference/wallet/get-wallet-and-balances",
+      "permanent": true
+    },
+    {
+      "source": "/api/copytrade/get-config",
+      "destination": "/api-reference/wallet/get-wallet-and-balances",
+      "permanent": true
+    },
+    {
+      "source": "/api/copytrade/keywords",
+      "destination": "/api-reference/wallet/get-wallet-and-balances",
+      "permanent": true
+    },
+    {
+      "source": "/api/copytrade/list-configs",
+      "destination": "/api-reference/wallet/get-wallet-and-balances",
+      "permanent": true
+    },
+    {
+      "source": "/api/copytrade/list-records",
+      "destination": "/api-reference/wallet/get-wallet-and-balances",
+      "permanent": true
+    },
+    {
+      "source": "/api/copytrade/market-types",
+      "destination": "/api-reference/wallet/get-wallet-and-balances",
+      "permanent": true
+    },
+    {
+      "source": "/api/copytrade/update-config",
+      "destination": "/api-reference/wallet/get-wallet-and-balances",
+      "permanent": true
+    },
+    {
+      "source": "/api/orders/cancel-order",
+      "destination": "/api-reference/wallet/get-wallet-and-balances",
+      "permanent": true
+    },
+    {
+      "source": "/api/orders/get-order",
+      "destination": "/api-reference/wallet/get-wallet-and-balances",
+      "permanent": true
+    },
+    {
+      "source": "/api/orders/list-orders",
+      "destination": "/api-reference/wallet/get-wallet-and-balances",
+      "permanent": true
+    },
+    {
+      "source": "/api/orders/place-order",
+      "destination": "/api-reference/wallet/get-wallet-and-balances",
+      "permanent": true
+    },
+    {
+      "source": "/api/positions/list-positions",
+      "destination": "/api-reference/wallet/get-wallet-and-balances",
+      "permanent": true
+    },
+    {
+      "source": "/api/wallet/create-withdrawal",
+      "destination": "/api-reference/wallet/get-wallet-and-balances",
+      "permanent": true
+    },
+    {
+      "source": "/api/wallet/get-wallet",
+      "destination": "/api-reference/wallet/get-wallet-and-balances",
+      "permanent": true
+    },
+    {
+      "source": "/api/wallet/get-withdrawal",
+      "destination": "/api-reference/wallet/get-wallet-and-balances",
+      "permanent": true
+    },
+    {
+      "source": "/api-reference",
+      "destination": "/api-reference/wallet/get-wallet-and-balances",
+      "permanent": true
+    },
+    {
+      "source": "/api-reference/orders/get-an-order-by-master-order-id",
+      "destination": "/api-reference/orders/get-an-order-by-order-id"
+    },
+    {
+      "source": "/api-reference/trading/get-web-trading-readiness",
+      "destination": "/api-reference/trading/get-trading-readiness"
+    }
+  ]
+}

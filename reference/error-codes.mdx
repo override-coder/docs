@@ -1,0 +1,154 @@
+---
+title: "Error codes"
+sidebarTitle: "Error codes"
+description: "Error codes returned by the third-party PolyCop OpenAPI."
+---
+
+Every error response includes a machine-readable `code`. Use it with the HTTP status when deciding whether to retry, fix the request, or contact support.
+
+## General errors
+
+Any endpoint can return these codes.
+
+| Code | HTTP | Meaning | Recommended action |
+|---|---|---|---|
+| `OK` | 200 | Request succeeded | No action |
+| `BAD_REQUEST` | 400 | The request is malformed or missing required fields | Fix the request before retrying |
+| `UNAUTHORIZED` | 401 | Authentication failed | Check your headers and signature |
+| `FORBIDDEN` | 403 | Key type, scope, source IP policy, or account policy denies the request | Check the key permissions and source IP; this code alone does not confirm successful signature verification |
+| `NOT_FOUND` | 404 | The requested resource does not exist | Verify the resource ID |
+| `VALIDATION_FAILED` | 400 / 422 | The request body failed schema validation | Correct the invalid body fields and retry |
+| `CONFLICT` | 409 | Conflict, such as an idempotency key reused with a different body | Check your request for duplicate keys |
+| `RATE_LIMITED` | 429 | Too many requests | Honor `Retry-After` when present; otherwise use exponential backoff with jitter |
+| `INTERNAL_ERROR` | 500 | Unexpected server-side error | For reads, retry with backoff; for writes, keep the original idempotency key and confirm the outcome |
+| `MASTER_UNAVAILABLE` | 502 | The service is temporarily unavailable | For reads, retry with backoff; for writes, keep the original idempotency key and confirm the outcome |
+
+## Account errors
+
+Use these codes to check whether the account exists and is active.
+
+| Code | HTTP | Meaning | Recommended action |
+|---|---|---|---|
+| `ACCOUNT_DISABLED` | 403 | Your account has been disabled | Contact support |
+| `ACCOUNT_NOT_FOUND` | 404 | The account does not exist | Verify the account ID |
+
+## API key errors
+
+Check your credentials and signing logic when you receive one of these codes.
+
+| Code | HTTP | Meaning | Recommended action |
+|---|---|---|---|
+| `API_KEY_INVALID` | 401 | The API key is missing, unknown, inactive, revoked, or expired | Verify the header value and replace expired keys |
+| `API_KEY_LIMIT_EXCEEDED` | 409 | Account active-key count limit reached | Review the number of active keys |
+| `API_KEY_SIGNATURE_INVALID` | 401 | The HMAC-SHA256 signature does not match the server's calculation | Review your canonical string construction, check field order, newline separators, and body hashing |
+| `API_KEY_TIMESTAMP_EXPIRED` | 401 | The `X-Timestamp` value is outside the configured clock window (default ±15 seconds) | Sync your system clock with NTP and regenerate a fresh timestamp |
+| `API_KEY_NONCE_REPLAYED` | 409 | The same API key has already used this nonce during its retention period | Generate a new cryptographically random nonce for every request |
+
+<Warning>
+  `API_KEY_SIGNATURE_INVALID` is the most common integration error. The usual
+  causes are using the short path, such as `/wallet`, instead of the full path,
+  such as `/openapi/v1/wallet`; hashing a body that differs from the exact bytes
+  sent over HTTP; or using escaped `\n` characters instead of real newline
+  bytes. See [Signing examples](/examples/signing) for reference
+  implementations.
+</Warning>
+
+## 2FA errors
+
+Endpoints that require 2FA, such as withdrawal creation, can return these codes.
+
+| Code | HTTP | Meaning | Recommended action |
+|---|---|---|---|
+| `TWO_FA_NOT_ENABLED` | 403 | Your account does not have 2FA configured | Complete 2FA setup before making withdrawal requests |
+| `TWO_FA_CODE_INVALID` | 400 | The 2FA code you provided is incorrect | Provide a valid current 6-digit 2FA code |
+| `TWO_FA_CODE_REPLAYED` | 409 | This 2FA code has already been used | Wait for the next 30-second 2FA window and provide a fresh code |
+| `TWO_FA_TOO_MANY_FAILURES` | 429 | Too many consecutive 2FA failures | Wait before retrying to avoid a temporary lockout |
+
+## Order errors
+
+Use these codes to handle failures from `/orders` requests.
+
+| Code | HTTP | Meaning | Recommended action |
+|---|---|---|---|
+| `ORDER_PLACE_FAILED` | 502 | The order could not be placed | Check your order parameters (decimal token ID, side, amount) |
+| `ORDER_CANCEL_FAILED` | 502 | The cancel request failed | Verify the current status of the order before retrying |
+| `ORDER_NOT_FOUND` | 404 | The order does not exist or belongs to a different account | Verify your `order_id` value |
+| `ORDER_INSUFFICIENT_BALANCE` | 422 | Your wallet balance is too low to fill the order | Top up your wallet balance |
+| `ORDER_RESULT_UNKNOWN` | 502 / 503 | The operation's result cannot be confirmed | Keep the original key and request; confirm the outcome before submitting again |
+
+<Warning>
+  Keep the original idempotency key and any returned `business_request_id`. That reference is not an exchange order ID. Query `GET /orders/{order_id}` only if you have an actual order ID. Configuration and redemption actions can also return HTTP `503` with `ORDER_RESULT_UNKNOWN`; they may have no order ID or business reference. See [Idempotency](/concepts/idempotency).
+</Warning>
+
+## Redemption and configuration conflicts
+
+| Code | HTTP | Meaning | Recommended action |
+|---|---|---|---|
+| `REDEEM_RESULT_UNKNOWN` | 409 | The redemption outcome is unknown | Refresh redeemable positions and confirm the outcome; do not switch keys to resubmit |
+| `CONFLICT` | 409 | The operation is processing, the body differs from the stored intent, or an auto-claim update is concurrent | Preserve the original intent; refresh state before deciding on a new operation |
+
+
+## Withdrawal errors
+
+Use these codes to check withdrawal parameters or investigate a failed request.
+
+| Code | HTTP | Meaning | Recommended action |
+|---|---|---|---|
+| `WITHDRAW_2FA_REQUIRED` | 403 | 2FA verification is required for withdrawals | Include a valid `2fa` field in your request body |
+| `WITHDRAW_NETWORK_UNSUPPORTED` | 400 | The specified network is not supported | Only Polygon (`polygon`) is supported in v1 |
+| `WITHDRAW_TOKEN_UNSUPPORTED` | 422 | The token contract address is not supported | Use one of the four supported token contract addresses listed in the API reference |
+| `WITHDRAW_ADDRESS_INVALID` | 422 | The destination address is not a valid Polygon address | Verify the address format (EIP-55 checksummed or lowercase hex) |
+| `WITHDRAW_AMOUNT_INVALID` | 422 | The withdrawal amount is invalid or below the minimum | Check the amount format and minimum withdrawal threshold |
+| `WITHDRAW_CREATE_FAILED` | 500 | The API could not complete the withdrawal request | Preserve the original key and check recovery state before further action |
+| `WITHDRAW_NOT_FOUND` | 404 | The withdrawal ID was not found | Verify your `withdraw_id` value |
+| `WITHDRAW_RESULT_UNKNOWN` | 502 / 503 | The withdrawal result cannot be confirmed | Query `GET /wallet/withdrawals/by-key` with the original `Idempotency-Key`; use the ID lookup if known |
+
+<Warning>
+  Only one active withdrawal per account is allowed at a time. A withdrawal
+  is considered active while its status is `processing`, `submitting`, or
+  `submitted`. Attempting to create a second withdrawal while one is active will
+  result in HTTP `409` with `CONFLICT`. Partner user keys and Telegram accounts cannot create withdrawals and receive `FORBIDDEN`. A recovery `404` is not proof that an earlier request did not execute.
+</Warning>
+
+## Copytrade errors
+
+Use these codes to handle failures from `/copytrade` requests.
+
+| Code | HTTP | Meaning | Recommended action |
+|---|---|---|---|
+| `COPYTRADE_CONFIG_NOT_FOUND` | 404 | The config does not exist or belongs to a different account | Verify your `config_id` value |
+| `COPYTRADE_CONFIG_INVALID` | 422 | One or more config parameters are invalid | Review the config fields in your request against the API reference |
+| `COPYTRADE_CREATE_FAILED` | 502 | The config creation request failed | Keep the original request and confirm the outcome before sending another write |
+| `COPYTRADE_UPDATE_FAILED` | 502 | The config update request failed | Keep the original request and confirm the outcome before sending another write |
+
+## Partner errors
+
+Partner user creation and API key issuance can return the following code.
+
+| Code | HTTP | Meaning | Recommended action |
+|---|---|---|---|
+| `PARTNER_USER_WALLET_NOT_READY` | 409 | The partner user's custodial wallet is not initialized yet | Retry `POST /partner/users` with the same `external_user_id`; issue a key only after `wallet_status=ready` |
+
+## Rate limiting
+
+When you exceed a rate limit, the server returns HTTP `429` with the code `RATE_LIMITED`. Bucket-based rejections include headers that tell you when to retry. Signature-failure throttling can return the same code without these headers. Pre-authentication limits can return `429` before credential validation or an unknown-route `404`. See [Rate limits](/concepts/rate-limits) for the per-endpoint limits.
+
+| Header | Description |
+|---|---|
+| `Retry-After` | Number of seconds you must wait before sending another request |
+| `X-RateLimit-Limit` | The effective request limit for the rate-limited bucket |
+| `X-RateLimit-Remaining` | Remaining requests in the current window (typically `0` on a 429 response) |
+| `X-RateLimit-Reset` | Seconds until the current rate-limit bucket resets |
+
+<Note>
+  The withdrawal creation endpoint (`POST /wallet/withdraw`) has a dedicated rate
+  limit of 5 requests per minute per account, which is stricter than the
+  general API rate limit. Build your retry logic to respect the `Retry-After`
+  value when present and use exponential backoff with jitter when it is absent.
+</Note>
+
+<Tip>
+  When you receive `429`, pause requests that share the affected limit. Honor `Retry-After` when present; otherwise
+  use exponential backoff with jitter. Regenerate signing headers on each retry.
+  Preserve the original API key, idempotency key, and intent for a repeated write.
+</Tip>

@@ -1,0 +1,4367 @@
+openapi: 3.0.3
+info:
+  title: PolyCop OpenAPI
+  version: 0.1.0
+  license:
+    name: Proprietary
+  description: |
+    Public third-party API for PolyCop, authenticated with API key and HMAC-SHA256.
+    Partner keys provision users and issue user keys; use each user's key for their trading requests.
+    Custodial wallets only. Partner user keys cannot withdraw or use wildcard scopes.
+    Eligible non-user keys require account-level 2FA for Polygon withdrawals.
+    This is not a Polymarket CLOB-compatible API.
+    Global, source IP, and endpoint limits also apply to unauthenticated requests; 429 does not confirm valid credentials.
+servers:
+- url: https://test-eu.polycopy.fun/openapi/v1
+  description: Test environment only; not production
+x-doc-classification:
+  level_1:
+  - Third-party API
+  level_2:
+    Third-party API:
+      programmatic_trading: API key plus HMAC
+  level_3:
+    Third-party API:
+    - wallet
+    - orders
+    - positions
+    - trading
+    - activity
+    - settings
+    - copytrade
+    - afk
+    - withdraw
+    - partner
+tags:
+- name: Partner
+  description: Partner-only APIs for provisioning partner users and creating user
+    API keys.
+- name: Wallet
+  description: Custodial wallet balance and Polygon withdrawal APIs.
+- name: Orders
+  description: Programmatic order placement, listing, lookup, and cancellation.
+- name: Positions
+  description: Account position query APIs.
+- name: Copytrade
+  description: Copytrade configuration, market filters, keywords, and execution records.
+- name: AFK
+  description: AFK strategy configuration and execution records.
+- name: Trading
+paths:
+  "/partner/users":
+    get:
+      tags:
+      - Partner
+      summary: List partner users
+      operationId: listPartnerUsers
+      description: Requires a partner API key with `partner:users:manage` or `*` scope.
+        Results are ordered by newest partner user first. Use the returned `next_cursor`
+        as the next request's `cursor`. The response contains non-sensitive partner
+        user information only.
+      security:
+      - ApiKeyAuth: []
+        ApiTimestamp: []
+        ApiNonce: []
+        ApiSignature: []
+      parameters:
+      - "$ref": "#/components/parameters/Limit"
+      - "$ref": "#/components/parameters/Cursor"
+      responses:
+        '200':
+          description: Partner user list
+          content:
+            application/json:
+              schema:
+                allOf:
+                - "$ref": "#/components/schemas/ApiResponse"
+                - type: object
+                  properties:
+                    data:
+                      "$ref": "#/components/schemas/PartnerUserListData"
+        '400':
+          "$ref": "#/components/responses/BadRequest"
+        '401':
+          "$ref": "#/components/responses/Unauthorized"
+        '403':
+          "$ref": "#/components/responses/Forbidden"
+        '409':
+          "$ref": "#/components/responses/Conflict"
+        '429':
+          "$ref": "#/components/responses/RateLimited"
+        '500':
+          "$ref": "#/components/responses/InternalServerError"
+        '502':
+          "$ref": "#/components/responses/DependencyUnavailable"
+    post:
+      tags:
+      - Partner
+      summary: Create or get a partner user
+      operationId: createPartnerUser
+      description: Requires a partner API key with `partner:users:manage` or `*` scope.
+      security:
+      - ApiKeyAuth: []
+        ApiTimestamp: []
+        ApiNonce: []
+        ApiSignature: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              "$ref": "#/components/schemas/PartnerUserCreateRequest"
+      responses:
+        '200':
+          description: Partner user created or returned
+          content:
+            application/json:
+              schema:
+                allOf:
+                - "$ref": "#/components/schemas/ApiResponse"
+                - type: object
+                  properties:
+                    data:
+                      "$ref": "#/components/schemas/PartnerUserData"
+        '400':
+          "$ref": "#/components/responses/BadRequest"
+        '401':
+          "$ref": "#/components/responses/Unauthorized"
+        '403':
+          "$ref": "#/components/responses/Forbidden"
+        '404':
+          "$ref": "#/components/responses/NotFound"
+        '409':
+          "$ref": "#/components/responses/Conflict"
+        '429':
+          "$ref": "#/components/responses/RateLimited"
+        '500':
+          "$ref": "#/components/responses/InternalServerError"
+        '502':
+          "$ref": "#/components/responses/DependencyUnavailable"
+        '503':
+          "$ref": "#/components/responses/ActionResultUnavailable"
+  "/partner/users/{user_account_id}/api-keys":
+    post:
+      tags:
+      - Partner
+      summary: Create a user API key for a partner user
+      operationId: createPartnerUserApiKey
+      description: Requires a partner API key with `partner:api_keys:manage` or `*`
+        scope. The partner user must have `wallet_status=ready`; if it is `pending`
+        or `failed`, retry create-or-get for the same `external_user_id` before creating
+        the user API key. The returned secret is issued only once; an idempotent replay
+        returns the original secret and expires_at without extending the deadline,
+        even if that child key has since expired. Use a new business intent to issue
+        a replacement key.
+      security:
+      - ApiKeyAuth: []
+        ApiTimestamp: []
+        ApiNonce: []
+        ApiSignature: []
+      parameters:
+      - "$ref": "#/components/parameters/IdempotencyKey"
+      - name: user_account_id
+        in: path
+        required: true
+        schema:
+          "$ref": "#/components/schemas/AccountId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              "$ref": "#/components/schemas/PartnerUserApiKeyCreateRequest"
+      responses:
+        '200':
+          description: User API key created
+          content:
+            application/json:
+              schema:
+                allOf:
+                - "$ref": "#/components/schemas/ApiResponse"
+                - type: object
+                  properties:
+                    data:
+                      "$ref": "#/components/schemas/CreateApiKeyData"
+        '400':
+          "$ref": "#/components/responses/BadRequest"
+        '401':
+          "$ref": "#/components/responses/Unauthorized"
+        '403':
+          "$ref": "#/components/responses/Forbidden"
+        '404':
+          "$ref": "#/components/responses/NotFound"
+        '409':
+          "$ref": "#/components/responses/Conflict"
+        '429':
+          "$ref": "#/components/responses/RateLimited"
+        '500':
+          "$ref": "#/components/responses/InternalServerError"
+        '502':
+          "$ref": "#/components/responses/DependencyUnavailable"
+        '503':
+          "$ref": "#/components/responses/ActionResultUnavailable"
+  "/partner/users/{user_account_id}/api-keys/{key_id}":
+    delete:
+      tags:
+      - Partner
+      summary: Revoke a user API key for a partner user
+      operationId: revokePartnerUserApiKey
+      description: Requires a partner API key with `partner:api_keys:manage` or `*`
+        scope. Only revokes user API keys created by the authenticated partner for
+        the specified `user_account_id`; it cannot revoke another partner's keys or
+        direct user keys.
+      security:
+      - ApiKeyAuth: []
+        ApiTimestamp: []
+        ApiNonce: []
+        ApiSignature: []
+      parameters:
+      - name: user_account_id
+        in: path
+        required: true
+        schema:
+          "$ref": "#/components/schemas/AccountId"
+      - "$ref": "#/components/parameters/KeyId"
+      responses:
+        '200':
+          description: User API key revoked
+          content:
+            application/json:
+              schema:
+                allOf:
+                - "$ref": "#/components/schemas/ApiResponse"
+                - type: object
+                  properties:
+                    data:
+                      type: object
+                      required:
+                      - status
+                      properties:
+                        status:
+                          type: string
+                          enum:
+                          - revoked
+        '400':
+          "$ref": "#/components/responses/BadRequest"
+        '401':
+          "$ref": "#/components/responses/Unauthorized"
+        '403':
+          "$ref": "#/components/responses/Forbidden"
+        '404':
+          "$ref": "#/components/responses/NotFound"
+        '409':
+          "$ref": "#/components/responses/Conflict"
+        '429':
+          "$ref": "#/components/responses/RateLimited"
+        '500':
+          "$ref": "#/components/responses/InternalServerError"
+        '502':
+          "$ref": "#/components/responses/DependencyUnavailable"
+        '503':
+          "$ref": "#/components/responses/ActionResultUnavailable"
+  "/wallet":
+    get:
+      x-required-scope: wallet:read
+      tags:
+      - Wallet
+      summary: Get wallet and balances
+      operationId: getWallet
+      security:
+      - ApiKeyAuth: []
+        ApiTimestamp: []
+        ApiNonce: []
+        ApiSignature: []
+      parameters:
+      - "$ref": "#/components/parameters/ForceRefresh"
+      responses:
+        '200':
+          description: Wallet
+          content:
+            application/json:
+              schema:
+                allOf:
+                - "$ref": "#/components/schemas/ApiResponse"
+                - type: object
+                  properties:
+                    data:
+                      "$ref": "#/components/schemas/Wallet"
+        '401':
+          "$ref": "#/components/responses/Unauthorized"
+        '400':
+          "$ref": "#/components/responses/BadRequest"
+        '403':
+          "$ref": "#/components/responses/Forbidden"
+        '409':
+          "$ref": "#/components/responses/Conflict"
+        '429':
+          "$ref": "#/components/responses/RateLimited"
+        '500':
+          "$ref": "#/components/responses/InternalServerError"
+        '502':
+          "$ref": "#/components/responses/DependencyUnavailable"
+  "/wallet/withdraw":
+    post:
+      x-required-scope: withdraw:create
+      tags:
+      - Wallet
+      summary: Create a Polygon withdrawal
+      operationId: createWithdrawal
+      parameters:
+      - "$ref": "#/components/parameters/RequiredIdempotencyKey"
+      description: |-
+        Creates a Polygon withdrawal for an eligible account. Telegram accounts and Partner user keys receive 403 FORBIDDEN. Status queries remain available.
+        Requires 2FA and Idempotency-Key. Keep the original key and exact body, including 2fa, on retries; refresh the HMAC signing headers. A different body with the same key returns CONFLICT. Idempotency covers the account across credentials and withdrawal routes; records do not expire automatically. Recover a lost response with GET /wallet/withdrawals/by-key.
+        Limit: 5 requests per minute per account. Only one withdrawal may be processing, submitting, or submitted at a time. A new withdrawal requires the previous one to be succeeded or failed.
+        Submission and on-chain confirmation are separate. Success returns submitted, or succeeded if already confirmed. An uncertain submission can return HTTP 200 with withdraw_id and status=submitting. This does not confirm acceptance or on-chain success. Poll the withdrawal status and confirm the outcome before starting another withdrawal. An unresolved submitting withdrawal continues to block new withdrawals. The API does not automatically resubmit it.
+      security:
+      - ApiKeyAuth: []
+        ApiTimestamp: []
+        ApiNonce: []
+        ApiSignature: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              "$ref": "#/components/schemas/CreateWithdrawalRequest"
+      responses:
+        '200':
+          description: Withdrawal created
+          content:
+            application/json:
+              schema:
+                allOf:
+                - "$ref": "#/components/schemas/ApiResponse"
+                - type: object
+                  properties:
+                    data:
+                      "$ref": "#/components/schemas/WithdrawalCreated"
+        '400':
+          "$ref": "#/components/responses/BadRequest"
+        '401':
+          "$ref": "#/components/responses/Unauthorized"
+        '403':
+          "$ref": "#/components/responses/Forbidden"
+        '404':
+          "$ref": "#/components/responses/NotFound"
+        '409':
+          "$ref": "#/components/responses/Conflict"
+        '422':
+          "$ref": "#/components/responses/ValidationFailed"
+        '429':
+          "$ref": "#/components/responses/RateLimited"
+        '500':
+          "$ref": "#/components/responses/InternalServerError"
+        '502':
+          "$ref": "#/components/responses/DependencyUnavailable"
+        '503':
+          description: The withdrawal result is unavailable. Recover it using the
+            original idempotency key; do not start another withdrawal.
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/ApiResponse"
+  "/wallet/withdrawals/by-key":
+    get:
+      x-required-scope: wallet:read
+      tags:
+      - Wallet
+      summary: Recover a withdrawal by its original idempotency key
+      description: |-
+        All recovery responses use Cache-Control: no-store; the key is a request header, not a cache selector.
+        Read-only recovery scoped to the authenticated account; API keys require wallet:read.
+        Returns the current withdrawal status without OTP or resubmission. Historical records have no key association and may return 404. A 404 is not
+        proof that an earlier request was not executed: do not automatically use a new key.
+      operationId: getWithdrawalByKey
+      security:
+      - ApiKeyAuth: []
+        ApiTimestamp: []
+        ApiNonce: []
+        ApiSignature: []
+      parameters:
+      - "$ref": "#/components/parameters/WithdrawalRecoveryKey"
+      responses:
+        '200':
+          headers:
+            Cache-Control:
+              "$ref": "#/components/headers/NoStore"
+          description: Withdrawal status
+          content:
+            application/json:
+              schema:
+                allOf:
+                - "$ref": "#/components/schemas/ApiResponse"
+                - type: object
+                  properties:
+                    data:
+                      "$ref": "#/components/schemas/Withdrawal"
+        '404':
+          "$ref": "#/components/responses/NotFound"
+        '400':
+          "$ref": "#/components/responses/BadRequest"
+        '401':
+          "$ref": "#/components/responses/Unauthorized"
+        '403':
+          "$ref": "#/components/responses/Forbidden"
+        '429':
+          "$ref": "#/components/responses/RateLimited"
+        '500':
+          "$ref": "#/components/responses/InternalServerError"
+        '503':
+          description: Recovery service unavailable; do not create another intent.
+        '409':
+          "$ref": "#/components/responses/Conflict"
+        '502':
+          "$ref": "#/components/responses/DependencyUnavailable"
+  "/wallet/withdrawals/{withdraw_id}":
+    get:
+      x-required-scope: wallet:read
+      tags:
+      - Wallet
+      summary: Get withdrawal status
+      operationId: getWithdrawal
+      security:
+      - ApiKeyAuth: []
+        ApiTimestamp: []
+        ApiNonce: []
+        ApiSignature: []
+      parameters:
+      - "$ref": "#/components/parameters/WithdrawId"
+      responses:
+        '200':
+          description: Withdrawal status
+          content:
+            application/json:
+              schema:
+                allOf:
+                - "$ref": "#/components/schemas/ApiResponse"
+                - type: object
+                  properties:
+                    data:
+                      "$ref": "#/components/schemas/Withdrawal"
+        '404':
+          "$ref": "#/components/responses/NotFound"
+        '400':
+          "$ref": "#/components/responses/BadRequest"
+        '401':
+          "$ref": "#/components/responses/Unauthorized"
+        '403':
+          "$ref": "#/components/responses/Forbidden"
+        '409':
+          "$ref": "#/components/responses/Conflict"
+        '429':
+          "$ref": "#/components/responses/RateLimited"
+        '500':
+          "$ref": "#/components/responses/InternalServerError"
+        '502':
+          "$ref": "#/components/responses/DependencyUnavailable"
+  "/orders":
+    post:
+      x-required-scope: trade:order
+      tags:
+      - Orders
+      summary: Place an order
+      operationId: placeOrder
+      parameters:
+      - "$ref": "#/components/parameters/RequiredOrderIdempotencyKey"
+      security:
+      - ApiKeyAuth: []
+        ApiTimestamp: []
+        ApiNonce: []
+        ApiSignature: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              "$ref": "#/components/schemas/PlaceOrderRequest"
+      responses:
+        '200':
+          description: Order accepted
+          content:
+            application/json:
+              schema:
+                allOf:
+                - "$ref": "#/components/schemas/ApiResponse"
+                - type: object
+                  properties:
+                    data:
+                      "$ref": "#/components/schemas/OrderResult"
+        '400':
+          "$ref": "#/components/responses/BadRequest"
+        '422':
+          "$ref": "#/components/responses/ValidationFailed"
+        '409':
+          description: Key reused with different parameters, or the original request
+            is still processing. Keep the original intent and reconcile; do not create
+            another key.
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/ErrorResponse"
+        '502':
+          description: Order service failure or unknown order result. Retain the original
+            key and business_request_id; a same-account, same-key retry never automatically
+            resubmits an unknown result.
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/ErrorResponse"
+        '503':
+          description: The order result is unavailable. If ORDER_RESULT_UNKNOWN is
+            returned, keep the original key and request and confirm the outcome. Do
+            not submit under a new key.
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/ErrorResponse"
+        '401':
+          "$ref": "#/components/responses/Unauthorized"
+        '403':
+          "$ref": "#/components/responses/Forbidden"
+        '429':
+          "$ref": "#/components/responses/RateLimited"
+        '500':
+          "$ref": "#/components/responses/InternalServerError"
+    get:
+      x-required-scope: trade:read
+      tags:
+      - Orders
+      summary: List account orders
+      description: Returns an empty `items` array when the account has no matching
+        orders. Items preserve the order returned by the service; `sortBy` and `sortDirection`
+        are not supported query parameters and do not change the result order.
+      operationId: listOrders
+      security:
+      - ApiKeyAuth: []
+        ApiTimestamp: []
+        ApiNonce: []
+        ApiSignature: []
+      parameters:
+      - "$ref": "#/components/parameters/AddressQuery"
+      - "$ref": "#/components/parameters/LocaleQuery"
+      responses:
+        '200':
+          description: Orders
+          content:
+            application/json:
+              schema:
+                allOf:
+                - "$ref": "#/components/schemas/ApiResponse"
+                - type: object
+                  properties:
+                    data:
+                      "$ref": "#/components/schemas/OrderList"
+        '400':
+          "$ref": "#/components/responses/BadRequest"
+        '401':
+          "$ref": "#/components/responses/Unauthorized"
+        '403':
+          "$ref": "#/components/responses/Forbidden"
+        '409':
+          "$ref": "#/components/responses/Conflict"
+        '429':
+          "$ref": "#/components/responses/RateLimited"
+        '500':
+          "$ref": "#/components/responses/InternalServerError"
+        '502':
+          "$ref": "#/components/responses/DependencyUnavailable"
+  "/orders/{order_id}":
+    get:
+      x-required-scope: trade:read
+      tags:
+      - Orders
+      summary: Get an order by order id
+      description: Returns `ORDER_NOT_FOUND` when the order does not exist or does
+        not belong to the current account.
+      operationId: getOrder
+      security:
+      - ApiKeyAuth: []
+        ApiTimestamp: []
+        ApiNonce: []
+        ApiSignature: []
+      parameters:
+      - "$ref": "#/components/parameters/OrderId"
+      - "$ref": "#/components/parameters/AddressQuery"
+      - "$ref": "#/components/parameters/LocaleQuery"
+      responses:
+        '200':
+          description: Order
+          content:
+            application/json:
+              schema:
+                allOf:
+                - "$ref": "#/components/schemas/ApiResponse"
+                - type: object
+                  properties:
+                    data:
+                      "$ref": "#/components/schemas/Order"
+        '404':
+          "$ref": "#/components/responses/NotFound"
+        '400':
+          "$ref": "#/components/responses/BadRequest"
+        '401':
+          "$ref": "#/components/responses/Unauthorized"
+        '403':
+          "$ref": "#/components/responses/Forbidden"
+        '409':
+          "$ref": "#/components/responses/Conflict"
+        '429':
+          "$ref": "#/components/responses/RateLimited"
+        '500':
+          "$ref": "#/components/responses/InternalServerError"
+        '502':
+          "$ref": "#/components/responses/DependencyUnavailable"
+    delete:
+      x-required-scope: trade:cancel
+      tags:
+      - Orders
+      summary: Cancel an order
+      operationId: cancelOrder
+      parameters:
+      - "$ref": "#/components/parameters/IdempotencyKey"
+      - "$ref": "#/components/parameters/OrderId"
+      security:
+      - ApiKeyAuth: []
+        ApiTimestamp: []
+        ApiNonce: []
+        ApiSignature: []
+      responses:
+        '200':
+          description: Cancel requested
+          content:
+            application/json:
+              schema:
+                allOf:
+                - "$ref": "#/components/schemas/ApiResponse"
+                - type: object
+                  properties:
+                    data:
+                      "$ref": "#/components/schemas/CancelOrderData"
+        '400':
+          "$ref": "#/components/responses/BadRequest"
+        '401':
+          "$ref": "#/components/responses/Unauthorized"
+        '403':
+          "$ref": "#/components/responses/Forbidden"
+        '409':
+          "$ref": "#/components/responses/Conflict"
+        '429':
+          "$ref": "#/components/responses/RateLimited"
+        '500':
+          "$ref": "#/components/responses/InternalServerError"
+        '502':
+          "$ref": "#/components/responses/DependencyUnavailable"
+        '503':
+          "$ref": "#/components/responses/ActionResultUnavailable"
+  "/positions":
+    get:
+      x-required-scope: positions:read
+      tags:
+      - Positions
+      summary: List account positions
+      operationId: listPositions
+      description: Lists positions for wallets owned by the authenticated account.
+        Omit address to use the default wallet. A signing address is resolved to its
+        proxy wallet. Foreign or unverified wallets return 404, malformed addresses
+        return 400, and unavailable ownership verification returns 502. Any copytrade
+        configurations included in the response belong to the authenticated account.
+        This endpoint does not provide public wallet lookup.
+      security:
+      - ApiKeyAuth: []
+        ApiTimestamp: []
+        ApiNonce: []
+        ApiSignature: []
+      parameters:
+      - "$ref": "#/components/parameters/PositionAddressQuery"
+      - "$ref": "#/components/parameters/MarketQuery"
+      - "$ref": "#/components/parameters/RedeemableQuery"
+      responses:
+        '200':
+          description: Positions
+          content:
+            application/json:
+              schema:
+                allOf:
+                - "$ref": "#/components/schemas/ApiResponse"
+                - type: object
+                  properties:
+                    data:
+                      "$ref": "#/components/schemas/PositionList"
+        '400':
+          "$ref": "#/components/responses/BadRequest"
+        '401':
+          "$ref": "#/components/responses/Unauthorized"
+        '403':
+          "$ref": "#/components/responses/Forbidden"
+        '404':
+          "$ref": "#/components/responses/NotFound"
+        '429':
+          "$ref": "#/components/responses/RateLimited"
+        '500':
+          "$ref": "#/components/responses/InternalServerError"
+        '502':
+          "$ref": "#/components/responses/DependencyUnavailable"
+        '409':
+          "$ref": "#/components/responses/Conflict"
+  "/copytrade/configs":
+    get:
+      x-required-scope: copytrade:read
+      tags:
+      - Copytrade
+      summary: List copytrade configs
+      description: Returns an empty `items` array when the account has no copytrade
+        configs.
+      operationId: listCopytradeConfigs
+      security:
+      - ApiKeyAuth: []
+        ApiTimestamp: []
+        ApiNonce: []
+        ApiSignature: []
+      parameters:
+      - "$ref": "#/components/parameters/Limit"
+      - "$ref": "#/components/parameters/Cursor"
+      responses:
+        '200':
+          description: Copytrade configs
+          content:
+            application/json:
+              schema:
+                allOf:
+                - "$ref": "#/components/schemas/ApiResponse"
+                - type: object
+                  properties:
+                    data:
+                      "$ref": "#/components/schemas/CopytradeConfigList"
+        '400':
+          "$ref": "#/components/responses/BadRequest"
+        '401':
+          "$ref": "#/components/responses/Unauthorized"
+        '403':
+          "$ref": "#/components/responses/Forbidden"
+        '409':
+          "$ref": "#/components/responses/Conflict"
+        '429':
+          "$ref": "#/components/responses/RateLimited"
+        '500':
+          "$ref": "#/components/responses/InternalServerError"
+        '502':
+          "$ref": "#/components/responses/DependencyUnavailable"
+    post:
+      x-required-scope: copytrade:manage
+      tags:
+      - Copytrade
+      summary: Create a copytrade config
+      description: Creates a copytrade configuration for the authenticated account.
+        Requires API key HMAC authentication; 2FA is not required.
+      operationId: createCopytradeConfig
+      parameters:
+      - "$ref": "#/components/parameters/RequiredActionIdempotencyKey"
+      security:
+      - ApiKeyAuth: []
+        ApiTimestamp: []
+        ApiNonce: []
+        ApiSignature: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              "$ref": "#/components/schemas/CopytradeConfigInput"
+            example:
+              target_address: '0x0000000000000000000000000000000000000000'
+              tag: leader A
+              copy_percentage: '100'
+              copy_fixed_amount: ''
+              max_token_spend: '1000'
+              total_token_spend: '5000'
+              min_copy_amount_per_trade: '1'
+              max_copy_amount_per_trade: '100'
+              min_price: '0.01'
+              max_price: '0.99'
+              slippage: '2'
+              copy_buy: true
+              copy_sell: true
+              limit_order_copy: false
+              sell_limit_order_copy: false
+              reverse_copy: false
+              keyword_whitelist: []
+              keyword_blacklist: []
+      responses:
+        '200':
+          description: Copytrade config created
+          content:
+            application/json:
+              schema:
+                allOf:
+                - "$ref": "#/components/schemas/ApiResponse"
+                - type: object
+                  properties:
+                    data:
+                      "$ref": "#/components/schemas/CopytradeConfig"
+        '401':
+          "$ref": "#/components/responses/Unauthorized"
+        '422':
+          "$ref": "#/components/responses/ValidationFailed"
+        '429':
+          "$ref": "#/components/responses/RateLimited"
+        '502':
+          "$ref": "#/components/responses/DependencyUnavailable"
+        '400':
+          "$ref": "#/components/responses/BadRequest"
+        '403':
+          "$ref": "#/components/responses/Forbidden"
+        '409':
+          "$ref": "#/components/responses/Conflict"
+        '500':
+          "$ref": "#/components/responses/InternalServerError"
+        '503':
+          "$ref": "#/components/responses/ActionResultUnavailable"
+  "/copytrade/configs/{config_id}":
+    get:
+      x-required-scope: copytrade:read
+      tags:
+      - Copytrade
+      summary: Get a copytrade config
+      description: Returns `COPYTRADE_CONFIG_NOT_FOUND` when the config does not exist
+        or does not belong to the current account.
+      operationId: getCopytradeConfig
+      parameters:
+      - "$ref": "#/components/parameters/ConfigId"
+      security:
+      - ApiKeyAuth: []
+        ApiTimestamp: []
+        ApiNonce: []
+        ApiSignature: []
+      responses:
+        '200':
+          description: Copytrade config
+          content:
+            application/json:
+              schema:
+                allOf:
+                - "$ref": "#/components/schemas/ApiResponse"
+                - type: object
+                  properties:
+                    data:
+                      "$ref": "#/components/schemas/CopytradeConfig"
+        '404':
+          "$ref": "#/components/responses/NotFound"
+        '400':
+          "$ref": "#/components/responses/BadRequest"
+        '401':
+          "$ref": "#/components/responses/Unauthorized"
+        '403':
+          "$ref": "#/components/responses/Forbidden"
+        '409':
+          "$ref": "#/components/responses/Conflict"
+        '429':
+          "$ref": "#/components/responses/RateLimited"
+        '500':
+          "$ref": "#/components/responses/InternalServerError"
+        '502':
+          "$ref": "#/components/responses/DependencyUnavailable"
+    patch:
+      x-required-scope: copytrade:manage
+      tags:
+      - Copytrade
+      summary: Update a copytrade config
+      description: Updates the supported fields of a copytrade configuration. Omit
+        target_address to keep it unchanged. Boolean fields specify the desired final
+        state. keyword_whitelist and keyword_blacklist are create-only and rejected
+        on update.
+      operationId: updateCopytradeConfig
+      parameters:
+      - "$ref": "#/components/parameters/RequiredActionIdempotencyKey"
+      - "$ref": "#/components/parameters/ConfigId"
+      security:
+      - ApiKeyAuth: []
+        ApiTimestamp: []
+        ApiNonce: []
+        ApiSignature: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              "$ref": "#/components/schemas/CopytradeConfigUpdateInput"
+      responses:
+        '200':
+          description: Copytrade config updated
+          content:
+            application/json:
+              schema:
+                allOf:
+                - "$ref": "#/components/schemas/ApiResponse"
+                - type: object
+                  properties:
+                    data:
+                      "$ref": "#/components/schemas/CopytradeConfig"
+        '404':
+          "$ref": "#/components/responses/NotFound"
+        '422':
+          "$ref": "#/components/responses/ValidationFailed"
+        '400':
+          "$ref": "#/components/responses/BadRequest"
+        '401':
+          "$ref": "#/components/responses/Unauthorized"
+        '403':
+          "$ref": "#/components/responses/Forbidden"
+        '409':
+          "$ref": "#/components/responses/Conflict"
+        '429':
+          "$ref": "#/components/responses/RateLimited"
+        '500':
+          "$ref": "#/components/responses/InternalServerError"
+        '502':
+          "$ref": "#/components/responses/DependencyUnavailable"
+        '503':
+          "$ref": "#/components/responses/ActionResultUnavailable"
+    delete:
+      x-required-scope: copytrade:manage
+      tags:
+      - Copytrade
+      summary: Disable a copytrade config
+      operationId: deleteCopytradeConfig
+      parameters:
+      - "$ref": "#/components/parameters/RequiredActionIdempotencyKey"
+      - "$ref": "#/components/parameters/ConfigId"
+      security:
+      - ApiKeyAuth: []
+        ApiTimestamp: []
+        ApiNonce: []
+        ApiSignature: []
+      responses:
+        '200':
+          description: Copytrade config disabled
+          content:
+            application/json:
+              schema:
+                allOf:
+                - "$ref": "#/components/schemas/ApiResponse"
+                - type: object
+                  properties:
+                    data:
+                      "$ref": "#/components/schemas/CopytradeConfig"
+        '404':
+          "$ref": "#/components/responses/NotFound"
+        '400':
+          "$ref": "#/components/responses/BadRequest"
+        '401':
+          "$ref": "#/components/responses/Unauthorized"
+        '403':
+          "$ref": "#/components/responses/Forbidden"
+        '409':
+          "$ref": "#/components/responses/Conflict"
+        '429':
+          "$ref": "#/components/responses/RateLimited"
+        '500':
+          "$ref": "#/components/responses/InternalServerError"
+        '502':
+          "$ref": "#/components/responses/DependencyUnavailable"
+        '503':
+          "$ref": "#/components/responses/ActionResultUnavailable"
+  "/copytrade/configs/{config_id}/keywords":
+    post:
+      x-required-scope: copytrade:manage
+      tags:
+      - Copytrade
+      summary: Add a copytrade keyword
+      description: Adds one keyword to a configuration whitelist or blacklist. Use
+        this endpoint for keyword changes instead of PATCH /copytrade/configs/{config_id}.
+        The configuration must belong to the authenticated account. Only config_type=1
+        is supported.
+      operationId: createCopytradeConfigKeyword
+      parameters:
+      - "$ref": "#/components/parameters/RequiredActionIdempotencyKey"
+      - "$ref": "#/components/parameters/ConfigId"
+      security:
+      - ApiKeyAuth: []
+        ApiTimestamp: []
+        ApiNonce: []
+        ApiSignature: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              "$ref": "#/components/schemas/CopytradeKeywordInput"
+            example:
+              key_word: election
+              list_type: 1
+              config_type: 1
+      responses:
+        '200':
+          description: Keyword added
+          content:
+            application/json:
+              schema:
+                allOf:
+                - "$ref": "#/components/schemas/ApiResponse"
+                - type: object
+                  properties:
+                    data:
+                      "$ref": "#/components/schemas/CopytradeKeywordResult"
+        '400':
+          "$ref": "#/components/responses/BadRequest"
+        '404':
+          "$ref": "#/components/responses/NotFound"
+        '422':
+          "$ref": "#/components/responses/ValidationFailed"
+        '401':
+          "$ref": "#/components/responses/Unauthorized"
+        '403':
+          "$ref": "#/components/responses/Forbidden"
+        '409':
+          "$ref": "#/components/responses/Conflict"
+        '429':
+          "$ref": "#/components/responses/RateLimited"
+        '500':
+          "$ref": "#/components/responses/InternalServerError"
+        '502':
+          "$ref": "#/components/responses/DependencyUnavailable"
+        '503':
+          "$ref": "#/components/responses/ActionResultUnavailable"
+  "/copytrade/configs/{config_id}/keywords/{key_word_id}":
+    delete:
+      x-required-scope: copytrade:manage
+      tags:
+      - Copytrade
+      summary: Delete a copytrade keyword
+      description: Deletes the keyword identified by key_word_id. Both the path configuration
+        and the target keyword must belong to the authenticated account. Use the configuration
+        containing that keyword in the path.
+      operationId: deleteCopytradeConfigKeyword
+      parameters:
+      - "$ref": "#/components/parameters/RequiredActionIdempotencyKey"
+      - "$ref": "#/components/parameters/ConfigId"
+      - "$ref": "#/components/parameters/KeyWordId"
+      security:
+      - ApiKeyAuth: []
+        ApiTimestamp: []
+        ApiNonce: []
+        ApiSignature: []
+      responses:
+        '200':
+          description: Keyword deleted
+          content:
+            application/json:
+              schema:
+                allOf:
+                - "$ref": "#/components/schemas/ApiResponse"
+                - type: object
+                  properties:
+                    data:
+                      "$ref": "#/components/schemas/CopytradeMutationResult"
+        '404':
+          "$ref": "#/components/responses/NotFound"
+        '400':
+          "$ref": "#/components/responses/BadRequest"
+        '401':
+          "$ref": "#/components/responses/Unauthorized"
+        '403':
+          "$ref": "#/components/responses/Forbidden"
+        '409':
+          "$ref": "#/components/responses/Conflict"
+        '422':
+          "$ref": "#/components/responses/ValidationFailed"
+        '429':
+          "$ref": "#/components/responses/RateLimited"
+        '500':
+          "$ref": "#/components/responses/InternalServerError"
+        '502':
+          "$ref": "#/components/responses/DependencyUnavailable"
+        '503':
+          "$ref": "#/components/responses/ActionResultUnavailable"
+  "/copytrade/configs/{config_id}/market-types":
+    patch:
+      x-required-scope: copytrade:manage
+      tags:
+      - Copytrade
+      summary: Update copytrade market type filters
+      description: Updates market-type switches. Each field accepts 1 for enabled
+        and 2 for disabled. Omit a field to leave it unchanged. config_id comes from
+        the path; do not send it in the body. The configuration must belong to the
+        authenticated account. Only config_type=1 is supported.
+      operationId: updateCopytradeMarketTypes
+      parameters:
+      - "$ref": "#/components/parameters/RequiredActionIdempotencyKey"
+      - "$ref": "#/components/parameters/ConfigId"
+      security:
+      - ApiKeyAuth: []
+        ApiTimestamp: []
+        ApiNonce: []
+        ApiSignature: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              "$ref": "#/components/schemas/CopytradeMarketTypesUpdateInput"
+            example:
+              config_type: 1
+              crypto: 1
+              sports: 2
+      responses:
+        '200':
+          description: Market types updated
+          content:
+            application/json:
+              schema:
+                allOf:
+                - "$ref": "#/components/schemas/ApiResponse"
+                - type: object
+                  properties:
+                    data:
+                      "$ref": "#/components/schemas/CopytradeMutationResult"
+        '400':
+          "$ref": "#/components/responses/BadRequest"
+        '404':
+          "$ref": "#/components/responses/NotFound"
+        '422':
+          "$ref": "#/components/responses/ValidationFailed"
+        '401':
+          "$ref": "#/components/responses/Unauthorized"
+        '403':
+          "$ref": "#/components/responses/Forbidden"
+        '409':
+          "$ref": "#/components/responses/Conflict"
+        '429':
+          "$ref": "#/components/responses/RateLimited"
+        '500':
+          "$ref": "#/components/responses/InternalServerError"
+        '502':
+          "$ref": "#/components/responses/DependencyUnavailable"
+        '503':
+          "$ref": "#/components/responses/ActionResultUnavailable"
+  "/afk/strategies":
+    get:
+      x-required-scope: afk:read
+      tags:
+      - AFK
+      summary: List AFK strategies
+      description: Lists AFK automatic trading strategies owned by the current account.
+      operationId: listAFKStrategies
+      security:
+      - ApiKeyAuth: []
+        ApiTimestamp: []
+        ApiNonce: []
+        ApiSignature: []
+      responses:
+        '200':
+          description: AFK strategies
+          content:
+            application/json:
+              schema:
+                allOf:
+                - "$ref": "#/components/schemas/ApiResponse"
+                - type: object
+                  properties:
+                    data:
+                      "$ref": "#/components/schemas/AFKStrategyList"
+        '400':
+          "$ref": "#/components/responses/BadRequest"
+        '401':
+          "$ref": "#/components/responses/Unauthorized"
+        '403':
+          "$ref": "#/components/responses/Forbidden"
+        '409':
+          "$ref": "#/components/responses/Conflict"
+        '429':
+          "$ref": "#/components/responses/RateLimited"
+        '500':
+          "$ref": "#/components/responses/InternalServerError"
+        '502':
+          "$ref": "#/components/responses/DependencyUnavailable"
+    post:
+      x-required-scope: afk:manage
+      tags:
+      - AFK
+      summary: Create an AFK strategy
+      description: Creates an AFK automatic trading strategy.
+      operationId: createAFKStrategy
+      parameters:
+      - "$ref": "#/components/parameters/RequiredActionIdempotencyKey"
+      security:
+      - ApiKeyAuth: []
+        ApiTimestamp: []
+        ApiNonce: []
+        ApiSignature: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              "$ref": "#/components/schemas/AFKStrategyInput"
+      responses:
+        '200':
+          description: AFK strategy created
+          content:
+            application/json:
+              schema:
+                allOf:
+                - "$ref": "#/components/schemas/ApiResponse"
+                - type: object
+                  properties:
+                    data:
+                      "$ref": "#/components/schemas/AFKStrategyCreateResult"
+        '422':
+          "$ref": "#/components/responses/ValidationFailed"
+        '400':
+          "$ref": "#/components/responses/BadRequest"
+        '401':
+          "$ref": "#/components/responses/Unauthorized"
+        '403':
+          "$ref": "#/components/responses/Forbidden"
+        '409':
+          "$ref": "#/components/responses/Conflict"
+        '429':
+          "$ref": "#/components/responses/RateLimited"
+        '500':
+          "$ref": "#/components/responses/InternalServerError"
+        '502':
+          "$ref": "#/components/responses/DependencyUnavailable"
+        '503':
+          "$ref": "#/components/responses/ActionResultUnavailable"
+  "/afk/strategies/{strategy_id}":
+    get:
+      x-required-scope: afk:read
+      tags:
+      - AFK
+      summary: Get an AFK strategy
+      description: Returns one AFK strategy owned by the current account.
+      operationId: getAFKStrategy
+      parameters:
+      - "$ref": "#/components/parameters/StrategyId"
+      security:
+      - ApiKeyAuth: []
+        ApiTimestamp: []
+        ApiNonce: []
+        ApiSignature: []
+      responses:
+        '200':
+          description: AFK strategy
+          content:
+            application/json:
+              schema:
+                allOf:
+                - "$ref": "#/components/schemas/ApiResponse"
+                - type: object
+                  properties:
+                    data:
+                      "$ref": "#/components/schemas/AFKStrategy"
+        '404':
+          "$ref": "#/components/responses/NotFound"
+        '400':
+          "$ref": "#/components/responses/BadRequest"
+        '401':
+          "$ref": "#/components/responses/Unauthorized"
+        '403':
+          "$ref": "#/components/responses/Forbidden"
+        '409':
+          "$ref": "#/components/responses/Conflict"
+        '429':
+          "$ref": "#/components/responses/RateLimited"
+        '500':
+          "$ref": "#/components/responses/InternalServerError"
+        '502':
+          "$ref": "#/components/responses/DependencyUnavailable"
+    patch:
+      x-required-scope: afk:manage
+      tags:
+      - AFK
+      summary: Update an AFK strategy
+      description: Updates an AFK automatic trading strategy.
+      operationId: updateAFKStrategy
+      parameters:
+      - "$ref": "#/components/parameters/RequiredActionIdempotencyKey"
+      - "$ref": "#/components/parameters/StrategyId"
+      security:
+      - ApiKeyAuth: []
+        ApiTimestamp: []
+        ApiNonce: []
+        ApiSignature: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              "$ref": "#/components/schemas/AFKStrategyUpdateInput"
+      responses:
+        '200':
+          description: AFK strategy updated
+          content:
+            application/json:
+              schema:
+                allOf:
+                - "$ref": "#/components/schemas/ApiResponse"
+                - type: object
+                  properties:
+                    data:
+                      "$ref": "#/components/schemas/AFKStrategy"
+        '404':
+          "$ref": "#/components/responses/NotFound"
+        '422':
+          "$ref": "#/components/responses/ValidationFailed"
+        '400':
+          "$ref": "#/components/responses/BadRequest"
+        '401':
+          "$ref": "#/components/responses/Unauthorized"
+        '403':
+          "$ref": "#/components/responses/Forbidden"
+        '409':
+          "$ref": "#/components/responses/Conflict"
+        '429':
+          "$ref": "#/components/responses/RateLimited"
+        '500':
+          "$ref": "#/components/responses/InternalServerError"
+        '502':
+          "$ref": "#/components/responses/DependencyUnavailable"
+        '503':
+          "$ref": "#/components/responses/ActionResultUnavailable"
+  "/afk/records":
+    get:
+      x-required-scope: afk:read
+      tags:
+      - AFK
+      summary: List AFK records
+      description: Returns AFK transaction records with cursor pagination.
+      operationId: listAFKRecords
+      security:
+      - ApiKeyAuth: []
+        ApiTimestamp: []
+        ApiNonce: []
+        ApiSignature: []
+      parameters:
+      - name: strategy_id
+        in: query
+        required: false
+        schema:
+          type: integer
+          format: uint64
+          minimum: 1
+        description: AFK strategy id filter. JavaScript clients must use lossless
+          integer parsing and must not store uint64 ids in a Number.
+      - name: status
+        in: query
+        required: false
+        schema:
+          type: integer
+          enum:
+          - 1
+          - 2
+          - 3
+          - 4
+          - 5
+        description: 'Optional AFK record status filter: 1=success, 2=failed, 3=waiting,
+          4=cancel, 5=partially. When status is 2, `error_msg` contains the failure
+          reason.'
+      - "$ref": "#/components/parameters/Limit"
+      - "$ref": "#/components/parameters/Cursor"
+      responses:
+        '200':
+          description: AFK record list
+          content:
+            application/json:
+              schema:
+                allOf:
+                - "$ref": "#/components/schemas/ApiResponse"
+                - type: object
+                  properties:
+                    data:
+                      "$ref": "#/components/schemas/AFKRecordList"
+        '400':
+          "$ref": "#/components/responses/BadRequest"
+        '401':
+          "$ref": "#/components/responses/Unauthorized"
+        '403':
+          "$ref": "#/components/responses/Forbidden"
+        '409':
+          "$ref": "#/components/responses/Conflict"
+        '429':
+          "$ref": "#/components/responses/RateLimited"
+        '500':
+          "$ref": "#/components/responses/InternalServerError"
+        '502':
+          "$ref": "#/components/responses/DependencyUnavailable"
+  "/copytrade/records":
+    get:
+      x-required-scope: copytrade:read
+      tags:
+      - Copytrade
+      summary: List copytrade records
+      operationId: listCopytradeRecords
+      security:
+      - ApiKeyAuth: []
+        ApiTimestamp: []
+        ApiNonce: []
+        ApiSignature: []
+      parameters:
+      - name: config_id
+        in: query
+        required: false
+        schema:
+          type: integer
+          minimum: 1
+      - name: status
+        in: query
+        required: false
+        schema:
+          type: integer
+          enum:
+          - 1
+          - 2
+          - 3
+          - 4
+          - 5
+        description: 'Optional record status filter: 1=success, 2=failed, 3=waiting,
+          4=cancel, 5=partially. When status is 2, `error_msg` contains the failure
+          reason when returned by the service.'
+      - "$ref": "#/components/parameters/CopytradeRecordLimit"
+      - "$ref": "#/components/parameters/Cursor"
+      responses:
+        '200':
+          description: Copytrade records
+          content:
+            application/json:
+              schema:
+                allOf:
+                - "$ref": "#/components/schemas/ApiResponse"
+                - type: object
+                  properties:
+                    data:
+                      "$ref": "#/components/schemas/CopytradeRecordList"
+        '400':
+          "$ref": "#/components/responses/BadRequest"
+        '401':
+          "$ref": "#/components/responses/Unauthorized"
+        '403':
+          "$ref": "#/components/responses/Forbidden"
+        '409':
+          "$ref": "#/components/responses/Conflict"
+        '429':
+          "$ref": "#/components/responses/RateLimited"
+        '500':
+          "$ref": "#/components/responses/InternalServerError"
+        '502':
+          "$ref": "#/components/responses/DependencyUnavailable"
+  "/trading/readiness":
+    get:
+      x-required-scope: trading:read
+      tags:
+      - Trading
+      description: Account readiness intersected with current API key scopes. User
+        keys cannot withdraw. can_view_markets is a public-market capability, not
+        an API scope grant. Missing permissions add API_KEY_SCOPE_REQUIRED or USER_API_KEY_WITHDRAW_DISABLED.
+      summary: Get trading readiness
+      operationId: getTradingReadiness
+      security:
+      - ApiKeyAuth: []
+        ApiTimestamp: []
+        ApiNonce: []
+        ApiSignature: []
+      responses:
+        '200':
+          description: Trading readiness
+          content:
+            application/json:
+              schema:
+                allOf:
+                - "$ref": "#/components/schemas/ApiResponse"
+                - type: object
+                  properties:
+                    data:
+                      "$ref": "#/components/schemas/WebTradingReadiness"
+        '401':
+          "$ref": "#/components/responses/Unauthorized"
+        '400':
+          "$ref": "#/components/responses/BadRequest"
+        '403':
+          "$ref": "#/components/responses/Forbidden"
+        '409':
+          "$ref": "#/components/responses/Conflict"
+        '429':
+          "$ref": "#/components/responses/RateLimited"
+        '500':
+          "$ref": "#/components/responses/InternalServerError"
+        '502':
+          "$ref": "#/components/responses/DependencyUnavailable"
+  "/closed-positions":
+    get:
+      x-required-scope: positions:read
+      tags:
+      - Trading
+      summary: List closed positions for the authenticated account
+      operationId: listClosedPositions
+      description: Accepts the same query parameter names as Polymarket Data API `/closed-positions`;
+        `user` must select a wallet owned by the authenticated account.
+      security:
+      - ApiKeyAuth: []
+        ApiTimestamp: []
+        ApiNonce: []
+        ApiSignature: []
+      parameters:
+      - "$ref": "#/components/parameters/PortfolioUserQuery"
+      - "$ref": "#/components/parameters/PortfolioMarketQuery"
+      - "$ref": "#/components/parameters/PortfolioTitleQuery"
+      - "$ref": "#/components/parameters/PortfolioEventIdQuery"
+      - name: limit
+        in: query
+        schema:
+          type: integer
+          minimum: 0
+          maximum: 50
+          default: 10
+      - name: offset
+        in: query
+        schema:
+          type: integer
+          minimum: 0
+          maximum: 100000
+          default: 0
+      - name: sortBy
+        in: query
+        schema:
+          type: string
+          enum:
+          - REALIZEDPNL
+          - TITLE
+          - PRICE
+          - AVGPRICE
+          - TIMESTAMP
+          default: REALIZEDPNL
+      - "$ref": "#/components/parameters/PortfolioSortDirectionQuery"
+      responses:
+        '200':
+          description: Closed positions
+          content:
+            application/json:
+              schema:
+                allOf:
+                - "$ref": "#/components/schemas/ApiResponse"
+                - type: object
+                  properties:
+                    data:
+                      "$ref": "#/components/schemas/ClosedPositionList"
+        '400':
+          "$ref": "#/components/responses/BadRequest"
+        '401':
+          "$ref": "#/components/responses/Unauthorized"
+        '404':
+          "$ref": "#/components/responses/NotFound"
+        '500':
+          "$ref": "#/components/responses/InternalServerError"
+        '502':
+          "$ref": "#/components/responses/DependencyUnavailable"
+        '403':
+          "$ref": "#/components/responses/Forbidden"
+        '409':
+          "$ref": "#/components/responses/Conflict"
+        '429':
+          "$ref": "#/components/responses/RateLimited"
+  "/activity":
+    get:
+      x-required-scope: activity:read
+      tags:
+      - Trading
+      summary: List activity for the authenticated account
+      operationId: listUserActivity
+      description: Accepts the activity query parameters supported by `go-polymarket-sdk`
+        `GetUserActivity`; `user` must select a wallet owned by the authenticated
+        account.
+      security:
+      - ApiKeyAuth: []
+        ApiTimestamp: []
+        ApiNonce: []
+        ApiSignature: []
+      parameters:
+      - "$ref": "#/components/parameters/PortfolioUserQuery"
+      - name: limit
+        in: query
+        description: Values above 500 are capped to 500.
+        schema:
+          type: integer
+          minimum: 0
+          default: 100
+      - name: offset
+        in: query
+        schema:
+          type: integer
+          minimum: 0
+          maximum: 5000
+          default: 0
+      - "$ref": "#/components/parameters/PortfolioMarketQuery"
+      - "$ref": "#/components/parameters/PortfolioEventIdQuery"
+      - name: type
+        in: query
+        style: form
+        explode: false
+        schema:
+          type: array
+          items:
+            type: string
+            enum:
+            - TRADE
+            - SPLIT
+            - MERGE
+            - REDEEM
+            - REWARD
+            - CONVERSION
+            - DEPOSIT
+            - WITHDRAWAL
+            - YIELD
+            - MAKER_REBATE
+            - TAKER_REBATE
+            - REFERRAL_REWARD
+      - name: excludeDepositsWithdrawals
+        in: query
+        description: Defaults to true; set to false to include deposit and withdrawal
+          activity.
+        schema:
+          type: boolean
+          default: true
+      - name: start
+        in: query
+        schema:
+          type: integer
+          format: int64
+          minimum: 0
+      - name: end
+        in: query
+        schema:
+          type: integer
+          format: int64
+          minimum: 0
+      - name: sortBy
+        in: query
+        schema:
+          type: string
+          enum:
+          - TIMESTAMP
+          - TOKENS
+          - CASH
+          default: TIMESTAMP
+      - "$ref": "#/components/parameters/PortfolioSortDirectionQuery"
+      - name: side
+        in: query
+        schema:
+          type: string
+          enum:
+          - BUY
+          - SELL
+      responses:
+        '200':
+          description: User activity
+          content:
+            application/json:
+              schema:
+                allOf:
+                - "$ref": "#/components/schemas/ApiResponse"
+                - type: object
+                  properties:
+                    data:
+                      "$ref": "#/components/schemas/UserActivityList"
+        '400':
+          "$ref": "#/components/responses/BadRequest"
+        '401':
+          "$ref": "#/components/responses/Unauthorized"
+        '404':
+          "$ref": "#/components/responses/NotFound"
+        '500':
+          "$ref": "#/components/responses/InternalServerError"
+        '502':
+          "$ref": "#/components/responses/DependencyUnavailable"
+        '403':
+          "$ref": "#/components/responses/Forbidden"
+        '409':
+          "$ref": "#/components/responses/Conflict"
+        '429':
+          "$ref": "#/components/responses/RateLimited"
+  "/positions/redeem":
+    post:
+      x-required-scope: positions:redeem
+      tags:
+      - Trading
+      summary: Redeem a redeemable position
+      description: Requests redemption for the authenticated user's default wallet
+        and condition. Requires Idempotency-Key. A completed response for the same
+        credential, key, and request is replayed for 24 hours. If the result is uncertain,
+        the API returns 409 REDEEM_RESULT_UNKNOWN; retries with that key return the
+        saved result without resubmitting. Refresh redeemable positions and confirm
+        the outcome before further action. Deduplication is not guaranteed across
+        different keys or credentials, expired records, interrupted requests, or other
+        redemption entry points. Success acknowledges submission but includes no transaction
+        ID or on-chain confirmation.
+      operationId: redeemPosition
+      security:
+      - ApiKeyAuth: []
+        ApiTimestamp: []
+        ApiNonce: []
+        ApiSignature: []
+      parameters:
+      - "$ref": "#/components/parameters/RequiredActionIdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              "$ref": "#/components/schemas/RedeemPositionRequest"
+      responses:
+        '200':
+          description: Redemption request accepted
+          content:
+            application/json:
+              schema:
+                allOf:
+                - "$ref": "#/components/schemas/ApiResponse"
+                - type: object
+                  properties:
+                    data:
+                      "$ref": "#/components/schemas/RedeemPositionResult"
+        '400':
+          "$ref": "#/components/responses/BadRequest"
+        '401':
+          "$ref": "#/components/responses/Unauthorized"
+        '403':
+          "$ref": "#/components/responses/Forbidden"
+        '404':
+          "$ref": "#/components/responses/NotFound"
+        '409':
+          "$ref": "#/components/responses/Conflict"
+        '422':
+          "$ref": "#/components/responses/ValidationFailed"
+        '429':
+          "$ref": "#/components/responses/RateLimited"
+        '500':
+          "$ref": "#/components/responses/InternalServerError"
+        '502':
+          "$ref": "#/components/responses/DependencyUnavailable"
+        '503':
+          "$ref": "#/components/responses/ActionResultUnavailable"
+  "/settings/auto-claim":
+    get:
+      x-required-scope: settings:read
+      tags:
+      - Trading
+      summary: Get automatic position redemption setting
+      operationId: getAutoClaimSetting
+      security:
+      - ApiKeyAuth: []
+        ApiTimestamp: []
+        ApiNonce: []
+        ApiSignature: []
+      responses:
+        '200':
+          description: Current automatic redemption setting
+          content:
+            application/json:
+              schema:
+                allOf:
+                - "$ref": "#/components/schemas/ApiResponse"
+                - type: object
+                  properties:
+                    data:
+                      "$ref": "#/components/schemas/AutoClaimSetting"
+        '401':
+          "$ref": "#/components/responses/Unauthorized"
+        '403':
+          "$ref": "#/components/responses/Forbidden"
+        '404':
+          "$ref": "#/components/responses/NotFound"
+        '429':
+          "$ref": "#/components/responses/RateLimited"
+        '500':
+          "$ref": "#/components/responses/InternalServerError"
+        '502':
+          "$ref": "#/components/responses/DependencyUnavailable"
+        '400':
+          "$ref": "#/components/responses/BadRequest"
+        '409':
+          "$ref": "#/components/responses/Conflict"
+    put:
+      x-required-scope: settings:manage
+      tags:
+      - Trading
+      summary: Set automatic position redemption
+      description: 'Sets the desired automatic redemption state: auto_claim=true enables
+        it and false disables it. Returns the confirmed setting. A concurrent update
+        for the same account can return 409 CONFLICT. Refresh the current setting
+        before submitting a new update with a new idempotency key.'
+      operationId: updateAutoClaimSetting
+      security:
+      - ApiKeyAuth: []
+        ApiTimestamp: []
+        ApiNonce: []
+        ApiSignature: []
+      parameters:
+      - "$ref": "#/components/parameters/RequiredActionIdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              "$ref": "#/components/schemas/AutoClaimSettingRequest"
+      responses:
+        '200':
+          description: Automatic redemption setting updated
+          content:
+            application/json:
+              schema:
+                allOf:
+                - "$ref": "#/components/schemas/ApiResponse"
+                - type: object
+                  properties:
+                    data:
+                      "$ref": "#/components/schemas/AutoClaimSetting"
+        '400':
+          "$ref": "#/components/responses/BadRequest"
+        '401':
+          "$ref": "#/components/responses/Unauthorized"
+        '403':
+          "$ref": "#/components/responses/Forbidden"
+        '404':
+          "$ref": "#/components/responses/NotFound"
+        '409':
+          "$ref": "#/components/responses/Conflict"
+        '429':
+          "$ref": "#/components/responses/RateLimited"
+        '500':
+          "$ref": "#/components/responses/InternalServerError"
+        '502':
+          "$ref": "#/components/responses/DependencyUnavailable"
+        '503':
+          "$ref": "#/components/responses/ActionResultUnavailable"
+components:
+  securitySchemes:
+    ApiKeyAuth:
+      type: apiKey
+      in: header
+      name: X-API-Key
+      description: API key id. Keys expire within 180 days of creation; user keys
+        cannot outlive the issuing parent deadline. Expired keys return 401 API_KEY_INVALID
+        before idempotent replay.
+    ApiTimestamp:
+      type: apiKey
+      in: header
+      name: X-Timestamp
+      description: Unix timestamp in seconds. Default allowed clock skew is 15 seconds
+        in either direction; deployment configuration may override it.
+    ApiNonce:
+      type: apiKey
+      in: header
+      name: X-Nonce
+      description: Random nonce, unique for each HTTP request under the same API key.
+        Generate a fresh nonce for every retry. Changing the timestamp does not allow
+        nonce reuse.
+    ApiSignature:
+      type: apiKey
+      in: header
+      name: X-Signature
+      description: |
+        HMAC-SHA256 signature.
+
+        Malformed query encoding and repeated scalar query parameters return 400 BAD_REQUEST. Parameter names are URL-decoded before this check; duplicate values are rejected even when identical. Repeated keys are supported only for GET /positions (market), GET /closed-positions (market, eventId), and GET /activity (market, eventId, type). CSV array values remain supported. The canonical query sorting algorithm is unchanged.
+
+        Canonical string:
+        `METHOD + "\n" + PATH + "\n" + QUERY + "\n" + TIMESTAMP + "\n" + NONCE + "\n" + BODY_SHA256`.
+  parameters:
+    Limit:
+      name: limit
+      in: query
+      required: false
+      schema:
+        type: integer
+        minimum: 1
+        maximum: 200
+        default: 50
+    Cursor:
+      name: cursor
+      in: query
+      required: false
+      schema:
+        type: string
+      description: Cursor returned as `next_cursor` from the previous page. OpenAPI
+        does not support offset pagination.
+    IdempotencyKey:
+      name: Idempotency-Key
+      in: header
+      required: false
+      description: Optional idempotency key. V1 does not reject requests that omit
+        it. Reuse a key only for the same method, path, query, and body after a timeout,
+        network failure, or unknown result. Completed responses other than orders
+        and withdrawals are available for replay for 24 hours; processing, unknown
+        and legacy failed records are retained and never automatically re-executed.
+        Order and withdrawal records are retained without automatic expiry. Only failures
+        explicitly confirmed to have occurred before execution are eligible for retry;
+        use a new key after correcting business query/body input that received a definite
+        4xx response. Authentication must succeed for a response to be replayed. For
+        API key HMAC requests, retry the same business key with a fresh timestamp
+        and nonce and a newly calculated signature.
+      schema:
+        type: string
+        maxLength: 128
+    KeyId:
+      name: key_id
+      in: path
+      required: true
+      schema:
+        type: string
+        example: pk_abc
+    ForceRefresh:
+      name: force_refresh
+      in: query
+      required: false
+      schema:
+        type: boolean
+        default: false
+      description: Optional wallet refresh flag. Omit or use false for normal cached
+        wallet reads.
+    RequiredIdempotencyKey:
+      name: Idempotency-Key
+      in: header
+      required: true
+      description: One account, the withdrawal operation, and this key identify one
+        withdrawal across sessions, keys, and routes. Keep the original key and exact
+        body (including 2fa) on retry. Changed body returns 409. Records do not expire
+        automatically. Current authentication and withdraw:create permission are required
+        before replay; refresh HMAC signing headers. After a timeout, query withdrawals/by-key
+        with the original key, without OTP. A different key is a new withdrawal intent.
+        Confirm the previous outcome before creating one. An old record may lack a
+        key association; recovery 404 does not prove non-execution. Ambiguous matching
+        records return 409 and require support reconciliation.
+      schema:
+        type: string
+        maxLength: 128
+    WithdrawalRecoveryKey:
+      name: Idempotency-Key
+      in: header
+      required: true
+      description: Original withdrawal intent key. Querying never executes a withdrawal
+        or consumes OTP. A 404 is not proof that an earlier request was not executed,
+        including historical unmapped records; never generate a new key automatically.
+      schema:
+        type: string
+        minLength: 1
+        maxLength: 128
+    WithdrawId:
+      name: withdraw_id
+      in: path
+      required: true
+      schema:
+        type: string
+        example: wd_202606011200000001
+    RequiredOrderIdempotencyKey:
+      name: Idempotency-Key
+      in: header
+      required: true
+      description: One account, order creation, and this key identify one order across
+        sessions, API keys, and order routes. Keep the key, query parameters, and
+        exact body on retry; changed parameters return 409 CONFLICT. Current authentication
+        and trade:order permission are required before replay. Refresh HMAC signing
+        headers. An unknown result returns its saved response or a processing conflict
+        on retry, without resubmission. Processing, unknown, failed, and completed
+        order records do not expire automatically. After a definite validation failure,
+        use a new key for corrected parameters. An identical request with a different
+        key creates a distinct order intent; another account has a separate scope.
+        Keep the original key and business_request_id and any order_id to confirm
+        the outcome before creating another order. business_request_id is a support
+        reference, not an exchange order ID. Ambiguous historical matches return 409
+        CONFLICT and require support reconciliation. Do not assume deduplication across
+        other trading entry points.
+      schema:
+        type: string
+        maxLength: 128
+    AddressQuery:
+      name: address
+      in: query
+      required: false
+      schema:
+        type: string
+      description: Optional wallet address filter.
+    LocaleQuery:
+      name: locale
+      in: query
+      required: false
+      schema:
+        type: string
+        example: en
+      description: Optional locale.
+    OrderId:
+      name: order_id
+      in: path
+      required: true
+      schema:
+        type: string
+        example: 0xorder
+    PositionAddressQuery:
+      name: address
+      in: query
+      required: false
+      schema:
+        type: string
+      description: Optional EVM signing or proxy address owned by the authenticated
+        account. Omit for the current default wallet. Other account wallets and copytrade
+        subwallets must also belong to this account; unknown or foreign addresses
+        are rejected.
+    MarketQuery:
+      name: market
+      in: query
+      required: false
+      style: form
+      explode: true
+      schema:
+        type: array
+        items:
+          type: string
+      description: Optional repeated market filters, for example `?market=a&market=b`.
+    RedeemableQuery:
+      name: redeemable
+      in: query
+      required: false
+      schema:
+        type: boolean
+      description: Optional redeemable-position filter.
+    RequiredActionIdempotencyKey:
+      name: Idempotency-Key
+      in: header
+      required: true
+      description: Required for writes including automation configuration and redemption.
+        Retry scope is account, credential, HTTP method, path, and key; requests using
+        different credentials are separate. Refresh HMAC signing headers. Current
+        scopes are required before replay. Use the same key and exact request body;
+        a changed body returns CONFLICT. Deterministic responses below HTTP 500 are
+        cached for 24 hours. An uncertain redemption returns REDEEM_RESULT_UNKNOWN
+        and is not resubmitted on retry. Refresh redeemable positions and confirm
+        the outcome instead of switching keys. After a definite validation failure,
+        or a concurrent auto-claim conflict followed by a refreshed setting, use a
+        new key for the new operation.
+      schema:
+        type: string
+        maxLength: 128
+    ConfigId:
+      name: config_id
+      in: path
+      required: true
+      schema:
+        type: string
+        example: '123'
+    KeyWordId:
+      name: key_word_id
+      in: path
+      required: true
+      description: Keyword record id returned in keyword query results. Used only
+        to delete the keyword binding.
+      schema:
+        type: integer
+        minimum: 1
+        maximum: 4294967295
+        example: 456
+    StrategyId:
+      name: strategy_id
+      in: path
+      required: true
+      description: AFK strategy config id.
+      schema:
+        type: string
+        example: '123'
+    CopytradeRecordLimit:
+      name: limit
+      in: query
+      required: false
+      schema:
+        type: integer
+        minimum: 1
+        maximum: 200
+        default: 20
+    PortfolioUserQuery:
+      name: user
+      in: query
+      required: false
+      schema:
+        type: string
+        pattern: "^0x[0-9a-fA-F]{40}$"
+      description: Polymarket user/proxy wallet. When provided it must belong to the
+        authenticated account; omit it to use the default wallet.
+    PortfolioMarketQuery:
+      name: market
+      in: query
+      required: false
+      style: form
+      explode: false
+      schema:
+        type: array
+        items:
+          type: string
+          pattern: "^0x[0-9a-fA-F]{64}$"
+      description: Comma-separated condition IDs. Mutually exclusive with eventId.
+    PortfolioTitleQuery:
+      name: title
+      in: query
+      required: false
+      schema:
+        type: string
+        maxLength: 100
+    PortfolioEventIdQuery:
+      name: eventId
+      in: query
+      required: false
+      style: form
+      explode: false
+      schema:
+        type: array
+        items:
+          type: integer
+          format: int64
+          minimum: 1
+      description: Comma-separated event IDs. Mutually exclusive with market.
+    PortfolioSortDirectionQuery:
+      name: sortDirection
+      in: query
+      required: false
+      schema:
+        type: string
+        enum:
+        - ASC
+        - DESC
+        default: DESC
+  schemas:
+    ApiResponse:
+      type: object
+      required:
+      - code
+      - message
+      - data
+      - request_id
+      properties:
+        code:
+          type: string
+          example: OK
+        message:
+          type: string
+          example: success
+        data:
+          nullable: true
+        request_id:
+          type: string
+          example: req_202606011200000001
+        business_request_id:
+          type: string
+          description: Stable order support reference for the same account, create-order
+            operation and Idempotency-Key across credentials and clients. Legacy records
+            retain their original reference. Also returned in X-Business-Request-ID.
+            Use it with the original key for support reconciliation, not as an exchange
+            order ID.
+          example: ord_39dad9393e068dced11e313210e79e69f7a5a2355bdcf9390f89b22daa659d8b
+    PartnerUserListData:
+      type: object
+      required:
+      - items
+      properties:
+        items:
+          type: array
+          items:
+            "$ref": "#/components/schemas/PartnerUserListItem"
+        next_cursor:
+          type: string
+          nullable: true
+          description: Cursor for the next page. It is the last `user_account_id`
+            from the current page; omit it when this field is absent.
+    PartnerUserListItem:
+      type: object
+      required:
+      - partner_account_id
+      - user_account_id
+      - external_user_id
+      - status
+      - wallet_status
+      - created_at
+      properties:
+        partner_account_id:
+          "$ref": "#/components/schemas/AccountId"
+        user_account_id:
+          "$ref": "#/components/schemas/AccountId"
+        external_user_id:
+          type: string
+          example: user_123
+        display_name:
+          type: string
+        status:
+          type: string
+          enum:
+          - active
+          - disabled
+        wallet_status:
+          type: string
+          enum:
+          - pending
+          - ready
+          - failed
+        wallet_address:
+          type: string
+          nullable: true
+          description: Public EVM wallet address for the partner user, when available.
+          example: '0x0000000000000000000000000000000000000000'
+        proxy_address:
+          type: string
+          nullable: true
+          description: Public proxy wallet address for the partner user, when available.
+          example: '0x0000000000000000000000000000000000000000'
+        created_at:
+          type: string
+          format: date-time
+        last_active_at:
+          type: string
+          format: date-time
+          nullable: true
+          description: Most recent usage time across user API keys created for this
+            partner user.
+    AccountId:
+      type: string
+      pattern: "^99[0-9]{20}$"
+      example: '9912345678901234564821'
+    ErrorResponse:
+      allOf:
+      - "$ref": "#/components/schemas/ApiResponse"
+      - type: object
+        properties:
+          code:
+            "$ref": "#/components/schemas/ErrorCode"
+          data:
+            nullable: true
+            example:
+    ErrorCode:
+      type: string
+      enum:
+      - OK
+      - BAD_REQUEST
+      - FORBIDDEN
+      - UNAUTHORIZED
+      - NOT_FOUND
+      - VALIDATION_FAILED
+      - CONFLICT
+      - RATE_LIMITED
+      - INTERNAL_ERROR
+      - MASTER_UNAVAILABLE
+      - ACCOUNT_DISABLED
+      - ACCOUNT_NOT_FOUND
+      - API_KEY_INVALID
+      - API_KEY_DISABLED
+      - API_KEY_LIMIT_EXCEEDED
+      - API_KEY_SIGNATURE_INVALID
+      - API_KEY_TIMESTAMP_EXPIRED
+      - API_KEY_NONCE_REPLAYED
+      - PARTNER_USER_WALLET_NOT_READY
+      - TWO_FA_NOT_ENABLED
+      - TWO_FA_CODE_INVALID
+      - TWO_FA_CODE_REPLAYED
+      - TWO_FA_TOO_MANY_FAILURES
+      - ORDER_PLACE_FAILED
+      - ORDER_CANCEL_FAILED
+      - ORDER_NOT_FOUND
+      - ORDER_INSUFFICIENT_BALANCE
+      - ORDER_RESULT_UNKNOWN
+      - REDEEM_RESULT_UNKNOWN
+      - WITHDRAW_2FA_REQUIRED
+      - WITHDRAW_NETWORK_UNSUPPORTED
+      - WITHDRAW_TOKEN_UNSUPPORTED
+      - WITHDRAW_ADDRESS_INVALID
+      - WITHDRAW_AMOUNT_INVALID
+      - WITHDRAW_CREATE_FAILED
+      - WITHDRAW_NOT_FOUND
+      - WITHDRAW_RESULT_UNKNOWN
+      - COPYTRADE_CONFIG_NOT_FOUND
+      - COPYTRADE_CONFIG_INVALID
+      - COPYTRADE_CREATE_FAILED
+      - COPYTRADE_UPDATE_FAILED
+    PartnerUserCreateRequest:
+      type: object
+      required:
+      - external_user_id
+      properties:
+        external_user_id:
+          type: string
+          maxLength: 128
+          description: Partner-side stable user id.
+          example: user_123
+        display_name:
+          type: string
+          maxLength: 128
+          example: Alice
+        email:
+          type: string
+          format: email
+          maxLength: 255
+          example: alice@example.com
+    PartnerUserData:
+      type: object
+      required:
+      - partner_account_id
+      - user_account_id
+      - external_user_id
+      - status
+      - wallet_status
+      - created_at
+      - updated_at
+      properties:
+        partner_account_id:
+          "$ref": "#/components/schemas/AccountId"
+        user_account_id:
+          "$ref": "#/components/schemas/AccountId"
+        external_user_id:
+          type: string
+          example: user_123
+        display_name:
+          type: string
+        email:
+          type: string
+        status:
+          type: string
+          enum:
+          - active
+          - disabled
+        wallet_status:
+          type: string
+          description: Wallet initialization status for this partner user. `ready`
+            means the user's custodial trading wallet has been initialized; `pending`
+            or `failed` means the partner may retry create-or-get for the same external_user_id
+            to initialize the wallet.
+          enum:
+          - pending
+          - ready
+          - failed
+        wallet_address:
+          type: string
+          nullable: true
+          description: Public EVM wallet address for the partner user, when available.
+          example: '0x0000000000000000000000000000000000000000'
+        proxy_address:
+          type: string
+          nullable: true
+          description: Public proxy wallet address for the partner user, when available.
+          example: '0x0000000000000000000000000000000000000000'
+        wallet_created:
+          type: boolean
+          nullable: true
+        wallet_initialized_at:
+          type: string
+          format: date-time
+          nullable: true
+        last_active_at:
+          type: string
+          format: date-time
+          nullable: true
+          description: Most recent usage time across user API keys created for this
+            partner user.
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+    PartnerUserApiKeyCreateRequest:
+      type: object
+      required:
+      - name
+      properties:
+        name:
+          type: string
+          example: user trading key
+        scopes:
+          type: array
+          maxItems: 32
+          description: |
+            Defaults to read-only scopes: trade:read, wallet:read, positions:read, copytrade:read and afk:read.
+            Explicit trading and automation write scopes remain supported; no monetary budgets are enforced.
+            Additional read scopes are trading:read, activity:read and settings:read.
+            Explicit write scopes include trade:order, trade:cancel, copytrade:manage, afk:manage,
+            positions:redeem and settings:manage. Write scopes require a non-empty ip_whitelist.
+            The wildcard scope `*` is not accepted for partner user keys.
+            `withdraw:create` is not supported for partner user API keys in V1.
+            A future withdrawal extension requires a separate partner-user 2FA binding flow.
+          items:
+            type: string
+          example:
+          - trade:order
+          - wallet:read
+        expires_at:
+          type: string
+          format: date-time
+          description: Optional future UTC deadline. Defaults to the earlier of issuance
+            plus 180 days and the issuing Partner Key expiry. An explicit deadline
+            cannot exceed either limit.
+        ip_whitelist:
+          "$ref": "#/components/schemas/APIKeyIPWhitelist"
+    APIKeyIPWhitelist:
+      type: array
+      maxItems: 64
+      description: IPv4/IPv6 addresses or CIDRs. Global /0 ranges are rejected. Required
+        for write scopes. Empty permits unrestricted reads only; all HMAC writes require
+        a bound source IP. Forwarded IPs are accepted only from configured trusted
+        proxies.
+      items:
+        type: string
+      example:
+      - 203.0.113.10/32
+    CreateApiKeyData:
+      allOf:
+      - "$ref": "#/components/schemas/ApiKey"
+      - type: object
+        required:
+        - secret
+        properties:
+          secret:
+            type: string
+            description: API key secret. Shown only once.
+            example: sk_xxx
+    ApiKey:
+      type: object
+      required:
+      - key_id
+      - name
+      - status
+      - scopes
+      - ip_whitelist
+      - created_at
+      properties:
+        key_id:
+          type: string
+          example: pk_abc
+        name:
+          type: string
+        status:
+          type: string
+          enum:
+          - active
+          - revoked
+          - disabled
+          - expired
+        scopes:
+          type: array
+          items:
+            type: string
+          example:
+          - trade:read
+          - wallet:read
+        ip_whitelist:
+          type: array
+          items:
+            type: string
+        expires_at:
+          type: string
+          format: date-time
+          description: UTC deadline. At most 180 days after creation; reset does not
+            extend it. Present on new issuance and list responses; a pre-upgrade cached
+            issuance response may omit this field, which does not mean unlimited validity.
+        last_used_at:
+          type: string
+          format: date-time
+          nullable: true
+        created_at:
+          type: string
+          format: date-time
+    Wallet:
+      type: object
+      required:
+      - account_id
+      - network
+      - wallet_address
+      - balances
+      properties:
+        account_id:
+          "$ref": "#/components/schemas/AccountId"
+        network:
+          "$ref": "#/components/schemas/Network"
+        wallet_address:
+          type: string
+          example: '0x0000000000000000000000000000000000000000'
+        proxy_wallet:
+          type: string
+          nullable: true
+        sol_wallet:
+          type: string
+          nullable: true
+          description: Solana deposit address.
+        account_value:
+          type: string
+          nullable: true
+          description: Account balance.
+        available_trade:
+          type: string
+          nullable: true
+          description: Available trading balance.
+        deposit_addr:
+          type: string
+          nullable: true
+          description: EVM deposit address.
+        tag:
+          type: string
+          nullable: true
+          description: Wallet alias.
+        balances:
+          type: array
+          items:
+            "$ref": "#/components/schemas/Balance"
+    Network:
+      type: string
+      enum:
+      - polygon
+    Balance:
+      type: object
+      required:
+      - token
+      - amount
+      properties:
+        token:
+          type: string
+          example: USDC
+        token_address:
+          type: string
+          nullable: true
+        amount:
+          type: string
+          example: '100.25'
+    CreateWithdrawalRequest:
+      type: object
+      required:
+      - network
+      - token
+      - amount
+      - destination
+      - 2fa
+      properties:
+        network:
+          "$ref": "#/components/schemas/Network"
+        token:
+          type: string
+          description: Polygon token contract address the recipient should receive.
+            Supported values are USDC `0x3c499c542cEF5E3811e1192ce70d8cC03d5c3359`,
+            USDC.e `0x2791Bca1f2de4661ED88A30C99A7a9449Aa84174`, USDT `0xc2132D05D31c914a87C6611C10748AEb04B58e8F`,
+            and PUSD `0xC011a7E12a19f7B1f670d46F03B03f3342E82DFB`.
+          enum:
+          - '0x3c499c542cEF5E3811e1192ce70d8cC03d5c3359'
+          - '0x2791Bca1f2de4661ED88A30C99A7a9449Aa84174'
+          - '0xc2132D05D31c914a87C6611C10748AEb04B58e8F'
+          - '0xC011a7E12a19f7B1f670d46F03B03f3342E82DFB'
+          example: '0x2791Bca1f2de4661ED88A30C99A7a9449Aa84174'
+        amount:
+          type: string
+          example: '10.5'
+        destination:
+          type: string
+          example: '0x0000000000000000000000000000000000000000'
+        2fa:
+          type: string
+          minLength: 6
+          maxLength: 6
+          pattern: "^[0-9]{6}$"
+    WithdrawalCreated:
+      type: object
+      required:
+      - withdraw_id
+      - status
+      properties:
+        withdraw_id:
+          type: string
+          example: wd_202606011200000001
+        status:
+          "$ref": "#/components/schemas/WithdrawalStatus"
+    WithdrawalStatus:
+      type: string
+      enum:
+      - processing
+      - submitting
+      - submitted
+      - succeeded
+      - failed
+    Withdrawal:
+      allOf:
+      - "$ref": "#/components/schemas/WithdrawalCreated"
+      - type: object
+        required:
+        - network
+        - token
+        - amount
+        - destination
+        - created_at
+        - updated_at
+        properties:
+          network:
+            "$ref": "#/components/schemas/Network"
+          token:
+            type: string
+          amount:
+            type: string
+          destination:
+            type: string
+          tx_hash:
+            type: string
+            nullable: true
+          created_at:
+            type: string
+            format: date-time
+          updated_at:
+            type: string
+            format: date-time
+    PlaceOrderRequest:
+      type: object
+      required:
+      - asset
+      - side
+      description: |-
+        Omitting price selects a market order; a supplied price must be valid and never falls back to market.
+        Market buy requires amount_usd >= 1 and no size. Limit buy requires amount_usd or size; if both are supplied amount_usd must equal price times size.
+        Sell requires exactly one of size or sell_percentage and no amount_usd. sell_all requires sell side and, when percentage is used, exactly 100.
+        Limit orders with an explicit quantity or amount must represent at least 5 shares. Percentage-based quantities and live market tick sizes are validated at execution.
+        Decimal inputs must be plain positive decimal strings (no sign, exponent, whitespace, NaN or Infinity). Omit optional fields instead of sending null.
+        The trading service also validates the order before execution.
+      properties:
+        asset:
+          type: string
+          pattern: "^[1-9][0-9]{0,77}$"
+          description: Positive decimal uint256 token ID (maximum 2^256-1).
+        side:
+          type: string
+          enum:
+          - buy
+          - sell
+        amount_usd:
+          type: string
+          maxLength: 32
+          pattern: "^(0|[1-9][0-9]*)(\\.[0-9]{1,6})?$"
+          description: Positive amount, at most 1000000000000, up to 6 decimal places.
+        price:
+          type: string
+          maxLength: 32
+          pattern: "^0\\.[0-9]{1,4}$"
+          description: Limit price from 0.0001 through 0.9999, up to 4 decimal places.
+            Omit for a market order. Empty, null, zero or malformed values are rejected.
+        size:
+          type: string
+          maxLength: 32
+          pattern: "^(0|[1-9][0-9]*)(\\.[0-9]{1,6})?$"
+          description: Positive shares, at most 1000000000000, up to 6 decimal places.
+        expiration:
+          type: integer
+          format: int64
+          minimum: 0
+          maximum: 4294967295
+          description: Limit order duration in seconds; nonzero values require price.
+        sell_all:
+          type: boolean
+          default: false
+        sell_percentage:
+          type: string
+          maxLength: 32
+          pattern: "^(0|[1-9][0-9]*)(\\.[0-9]{1,4})?$"
+          description: Percentage greater than 0 and at most 100, up to 4 decimal
+            places.
+        metadata:
+          "$ref": "#/components/schemas/OrderMetadata"
+    OrderMetadata:
+      type: object
+      properties:
+        title:
+          type: string
+        slug:
+          type: string
+        condition_id:
+          type: string
+        outcome:
+          type: string
+    OrderResult:
+      type: object
+      required:
+      - order_id
+      - filled
+      properties:
+        order_id:
+          type: string
+        filled:
+          type: boolean
+        tx_hash:
+          type: string
+        sell_size:
+          type: string
+    OrderList:
+      type: object
+      required:
+      - items
+      properties:
+        items:
+          type: array
+          items:
+            "$ref": "#/components/schemas/Order"
+    Order:
+      type: object
+      description: 'Complete public mapping of `Order`. Compatibility aliases are
+        retained: `order_id=id`, `asset=asset_id`, and `size=original_size`. `status`
+        is the API status while `master_status` preserves the original value.'
+      required:
+      - associate_trades
+      - id
+      - order_id
+      - status
+      - master_status
+      - market
+      - original_size
+      - size
+      - outcome
+      - owner
+      - price
+      - side
+      - size_matched
+      - asset_id
+      - asset
+      - expiration
+      - type
+      - created_at
+      - event_slug
+      - slug
+      - cfgs
+      properties:
+        associate_trades:
+          type: array
+          items:
+            type: string
+        id:
+          type: string
+        order_id:
+          type: string
+        status:
+          "$ref": "#/components/schemas/OrderStatus"
+        master_status:
+          type: string
+        market:
+          type: string
+        original_size:
+          type: string
+        size:
+          type: string
+          nullable: true
+        outcome:
+          type: string
+        owner:
+          type: string
+        price:
+          type: string
+          nullable: true
+        side:
+          type: string
+          enum:
+          - buy
+          - sell
+        size_matched:
+          type: string
+        asset_id:
+          type: string
+        asset:
+          type: string
+        expiration:
+          type: string
+        type:
+          type: string
+        created_at:
+          type: string
+          format: date-time
+          nullable: true
+        event_slug:
+          type: string
+        slug:
+          type: string
+        cfgs:
+          allOf:
+          - "$ref": "#/components/schemas/OrderCopyConfig"
+          nullable: true
+    OrderStatus:
+      type: string
+      enum:
+      - open
+      - filled
+      - canceled
+      - failed
+      - unknown
+    OrderCopyConfig:
+      type: object
+      required:
+      - config_id
+      - target_address
+      - tag
+      - score
+      - win_rate
+      - profile_image
+      properties:
+        config_id:
+          type: string
+          description: copy or AFK configuration id as a lossless decimal string.
+        target_address:
+          type: string
+        tag:
+          type: string
+        score:
+          type: string
+        win_rate:
+          type: string
+        profile_image:
+          type: string
+    CancelOrderData:
+      type: object
+      required:
+      - order_id
+      - status
+      properties:
+        order_id:
+          type: string
+        status:
+          type: string
+          enum:
+          - cancel_requested
+    PositionList:
+      type: object
+      required:
+      - items
+      properties:
+        items:
+          type: array
+          items:
+            "$ref": "#/components/schemas/Position"
+    Position:
+      type: object
+      required:
+      - proxy_wallet
+      - asset
+      - condition_id
+      - size
+      - avg_price
+      - initial_value
+      - current_value
+      - cash_pnl
+      - percent_pnl
+      - total_bought
+      - realized_pnl
+      - percent_realized_pnl
+      - cur_price
+      - redeemable
+      - mergeable
+      - title
+      - slug
+      - icon
+      - event_slug
+      - outcome
+      - outcome_index
+      - opposite_outcome
+      - opposite_asset
+      - end_date
+      - negative_risk
+      - outcome_price
+      - opposite_outcome_price
+      - dispute
+      - cfgs
+      - afk_cfgs
+      properties:
+        proxy_wallet:
+          type: string
+        asset:
+          type: string
+        condition_id:
+          type: string
+        outcome:
+          type: string
+        size:
+          type: string
+        avg_price:
+          type: string
+        initial_value:
+          type: string
+        current_value:
+          type: string
+        cash_pnl:
+          type: string
+        percent_pnl:
+          type: string
+        total_bought:
+          type: string
+        realized_pnl:
+          type: string
+        percent_realized_pnl:
+          type: string
+        cur_price:
+          type: string
+        current_price:
+          type: string
+          nullable: true
+        value:
+          type: string
+          nullable: true
+        pnl:
+          type: string
+          nullable: true
+        redeemable:
+          type: boolean
+        mergeable:
+          type: boolean
+        title:
+          type: string
+        slug:
+          type: string
+        icon:
+          type: string
+        event_slug:
+          type: string
+        outcome_index:
+          type: integer
+          format: int64
+        opposite_outcome:
+          type: string
+        opposite_asset:
+          type: string
+        end_date:
+          type: string
+        negative_risk:
+          type: boolean
+        outcome_price:
+          type: string
+        opposite_outcome_price:
+          type: string
+        dispute:
+          type: boolean
+        cfgs:
+          type: array
+          items:
+            "$ref": "#/components/schemas/OrderCopyConfig"
+        afk_cfgs:
+          type: array
+          items:
+            "$ref": "#/components/schemas/AFKConfig"
+    AFKConfig:
+      type: object
+      required:
+      - config_id
+      - tag
+      properties:
+        config_id:
+          type: string
+        tag:
+          type: string
+    CopytradeConfigList:
+      type: object
+      required:
+      - items
+      properties:
+        items:
+          type: array
+          items:
+            "$ref": "#/components/schemas/CopytradeConfig"
+        next_cursor:
+          type: string
+          nullable: true
+    CopytradeConfig:
+      type: object
+      required:
+      - config_id
+      - target_address
+      - status
+      description: Copytrade configuration. Status 0 is exposed as paused.
+      properties:
+        telegram_id:
+          type: string
+          description: "`telegram_id`."
+        config_id:
+          type: string
+          example: '123'
+          description: "`config_id`."
+        target_address:
+          type: string
+          description: "`target_address`."
+        tag:
+          type: string
+          nullable: true
+          description: "`tag`."
+        copy_percentage:
+          type: string
+          nullable: true
+          description: "`copy_percentage`."
+        limit_order_copy:
+          type: boolean
+          nullable: true
+          description: "`limit_order_copy`."
+        limit_order_validity_period:
+          type: string
+          nullable: true
+          description: "`limit_order_validity_period`."
+        max_limit_order_price_diff:
+          type: string
+          nullable: true
+          description: "`max_limit_order_price_diff`."
+        max_token_spend:
+          type: string
+          nullable: true
+          description: "`max_token_spend`."
+        total_token_spend:
+          type: string
+          nullable: true
+          description: "`total_token_spend`."
+        buy_at_min:
+          type: boolean
+          nullable: true
+          description: "`buy_at_min`."
+        create_dt:
+          type: string
+          nullable: true
+          description: "`create_dt` unix timestamp as a string."
+        copy_fixed_amount:
+          type: string
+          nullable: true
+          description: "`copy_fixed_amount`."
+        min_trader_trade_amount:
+          type: string
+          nullable: true
+          description: "`min_trader_trade_amount`."
+        min_copy_amount_per_trade:
+          type: string
+          nullable: true
+          description: "`min_copy_amount_per_trade`."
+        max_copy_amount_per_trade:
+          type: string
+          nullable: true
+          description: "`max_copy_amount_per_trade`."
+        min_price:
+          type: string
+          nullable: true
+          description: "`min_price`."
+        max_price:
+          type: string
+          nullable: true
+          description: "`max_price`."
+        slippage:
+          type: string
+          nullable: true
+          description: "`slippage`."
+        max_spend_per_market:
+          type: string
+          nullable: true
+          description: "`max_spend_per_market`."
+        max_holder_market_number:
+          type: string
+          nullable: true
+          description: "`max_holder_market_number`."
+        take_profit_percentage:
+          type: string
+          nullable: true
+          description: "`take_profit_percentage`."
+        take_profit_price:
+          type: string
+          nullable: true
+          description: "`take_profit_price`."
+        stop_loss_percentage:
+          type: string
+          nullable: true
+          description: "`stop_loss_percentage`."
+        stop_loss_price:
+          type: string
+          nullable: true
+          description: "`stop_loss_price`."
+        copy_buy:
+          type: boolean
+          nullable: true
+          description: "`copy_buy`."
+        copy_sell:
+          type: boolean
+          nullable: true
+          description: "`copy_sell`."
+        market_sell_slippage:
+          type: string
+          nullable: true
+          description: "`market_sell_slippage`."
+        sell_limit_order_copy:
+          type: boolean
+          nullable: true
+          description: "`sell_limit_order_copy`."
+        sell_limit_order_price_diff:
+          type: string
+          nullable: true
+          description: "`sell_limit_order_price_diff`."
+        sell_limit_order_validity_period:
+          type: string
+          nullable: true
+          description: "`sell_limit_order_validity_period`."
+        max_5m_market_start_time:
+          type: string
+          nullable: true
+          description: "`max_5m_market_start_time`."
+        max_5m_market_end_time:
+          type: string
+          nullable: true
+          description: "`max_5m_market_end_time`."
+        max_15m_market_start_time:
+          type: string
+          nullable: true
+          description: "`max_15m_market_start_time`."
+        max_15m_market_end_time:
+          type: string
+          nullable: true
+          description: "`max_15m_market_end_time`."
+        tp_balance_threshold:
+          type: string
+          nullable: true
+          description: "`tp_balance_threshold`."
+        sl_balance_threshold:
+          type: string
+          nullable: true
+          description: "`sl_balance_threshold`."
+        reverse_copy:
+          type: boolean
+          nullable: true
+          description: "`reverse_copy`."
+        is_master:
+          type: boolean
+          nullable: true
+          description: "`is_master`."
+        total_investment:
+          type: string
+          nullable: true
+          description: "`total_investment`."
+        wallet_address:
+          type: string
+          nullable: true
+          description: "`wallet_address`."
+        proxy_address:
+          type: string
+          nullable: true
+          description: "`proxy_address`."
+        sub_address:
+          type: string
+          nullable: true
+          description: "`sub_address`."
+        sub_proxy_address:
+          type: string
+          nullable: true
+          description: "`sub_proxy_address`."
+        max_trader_trade_amount:
+          type: string
+          nullable: true
+          description: "`max_trader_trade_amount`."
+        failure_retry:
+          type: string
+          nullable: true
+          description: "`failure_retry`."
+        limit_expired_to_market:
+          type: boolean
+          nullable: true
+          description: "`limit_expired_to_market`."
+        use_buy_order_book:
+          type: boolean
+          nullable: true
+          description: "`use_buy_order_book`."
+        buy_bid_level:
+          type: string
+          nullable: true
+          description: "`buy_bid_level`."
+        buy_ask_level:
+          type: string
+          nullable: true
+          description: "`buy_ask_level`."
+        use_sell_order_book:
+          type: boolean
+          nullable: true
+          description: "`use_sell_order_book`."
+        sell_bid_level:
+          type: string
+          nullable: true
+          description: "`sell_bid_level`."
+        sell_ask_level:
+          type: string
+          nullable: true
+          description: "`sell_ask_level`."
+        buy_order_book_mode:
+          type: string
+          nullable: true
+          description: "`buy_order_book_mode`."
+        sell_order_book_mode:
+          type: string
+          nullable: true
+          description: "`sell_order_book_mode`."
+        turbo_mode:
+          type: boolean
+          nullable: true
+          description: "`turbo_mode`."
+        status:
+          "$ref": "#/components/schemas/CopytradeStatus"
+        created_at:
+          type: string
+          format: date-time
+          nullable: true
+          description: Derived from `create_dt` when available.
+        updated_at:
+          type: string
+          format: date-time
+          nullable: true
+    CopytradeStatus:
+      type: string
+      enum:
+      - running
+      - paused
+      - disabled
+    CopytradeConfigInput:
+      type: object
+      required:
+      - target_address
+      properties:
+        target_address:
+          type: string
+          description: Trader wallet address to follow.
+        tag:
+          type: string
+          description: User-visible label for this copytrade config.
+        copy_percentage:
+          type: string
+          description: Percentage of the trader's order size to copy. Decimal string;
+        limit_order_copy:
+          type: boolean
+          description: Whether to copy buy limit orders. On PATCH, specify the desired
+            final state.
+        limit_order_validity_period:
+          type: string
+          description: Validity period for copied buy limit orders. Decimal/integer
+            string.
+        max_limit_order_price_diff:
+          type: string
+          description: Maximum allowed price difference for copied buy limit orders.
+            Decimal string.
+        max_token_spend:
+          type: string
+          description: Maximum token spend cap for this config. Decimal string.
+        total_token_spend:
+          type: string
+          description: Total token spend cap for this config. Decimal string.
+        buy_at_min:
+          type: boolean
+          description: Whether buy copy should use minimum-price behavior.
+        copy_fixed_amount:
+          type: string
+          description: Fixed amount to copy per trade. Decimal string.
+        min_trader_trade_amount:
+          type: string
+          description: Minimum source trader trade amount required before copying.
+            Decimal string.
+        max_trader_trade_amount:
+          type: string
+          description: Maximum source trader trade amount allowed for copying. Decimal
+            string.
+        min_copy_amount_per_trade:
+          type: string
+          description: Minimum copied amount per trade. Decimal string.
+        max_copy_amount_per_trade:
+          type: string
+          description: Maximum copied amount per trade. Decimal string.
+        min_price:
+          type: string
+          description: Minimum market/order price allowed for copying. Decimal string.
+        max_price:
+          type: string
+          description: Maximum market/order price allowed for copying. Decimal string.
+        slippage:
+          type: string
+          description: Buy-side market-order slippage tolerance. Decimal string.
+        max_spend_per_market:
+          type: string
+          description: Maximum spend cap per market. Decimal string.
+        max_holder_market_number:
+          type: string
+          description: Maximum number of holder markets allowed. Integer string.
+        take_profit_percentage:
+          type: string
+          description: Take-profit trigger percentage. Decimal string.
+        take_profit_price:
+          type: string
+          description: Take-profit trigger price. Decimal string.
+        stop_loss_percentage:
+          type: string
+          description: Stop-loss trigger percentage. Decimal string.
+        stop_loss_price:
+          type: string
+          description: Stop-loss trigger price. Decimal string.
+        copy_buy:
+          type: boolean
+          description: Whether buy trades are copied. On PATCH, specify the desired
+            final state.
+        copy_sell:
+          type: boolean
+          description: Whether sell trades are copied. On PATCH, specify the desired
+            final state.
+        market_sell_slippage:
+          type: string
+          description: Sell-side market-order slippage tolerance. Decimal string.
+        sell_limit_order_copy:
+          type: boolean
+          description: Whether to copy sell limit orders. On PATCH, specify the desired
+            final state.
+        sell_limit_order_price_diff:
+          type: string
+          description: Maximum allowed price difference for copied sell limit orders.
+            Decimal string.
+        sell_limit_order_validity_period:
+          type: string
+          description: Validity period for copied sell limit orders. Decimal/integer
+            string.
+        max_5m_market_start_time:
+          type: string
+          description: Earliest allowed start-time window for 5-minute markets. String.
+        max_5m_market_end_time:
+          type: string
+          description: Latest allowed end-time window for 5-minute markets. String.
+        max_15m_market_start_time:
+          type: string
+          description: Earliest allowed start-time window for 15-minute markets. String.
+        max_15m_market_end_time:
+          type: string
+          description: Latest allowed end-time window for 15-minute markets. String.
+        tp_balance_threshold:
+          type: string
+          description: Balance threshold used by take-profit logic. Decimal string.
+        sl_balance_threshold:
+          type: string
+          description: Balance threshold used by stop-loss logic. Decimal string.
+        reverse_copy:
+          type: boolean
+          description: Whether to invert copied trade direction. On PATCH, specify
+            the desired final state.
+        is_master:
+          type: boolean
+          description: Create-only flag; not supported by configuration updates.
+        total_investment:
+          type: string
+          description: Create-only total investment amount. Decimal string.
+        only_copy_markets_types:
+          "$ref": "#/components/schemas/CopytradeMarketTypesInput"
+        keyword_whitelist:
+          description: Create-time whitelist keywords. For later changes use POST
+            `/copytrade/configs/{config_id}/keywords`.
+          type: array
+          items:
+            type: string
+        keyword_blacklist:
+          description: Create-time blacklist keywords. For later changes use POST
+            `/copytrade/configs/{config_id}/keywords`.
+          type: array
+          items:
+            type: string
+        failure_retry:
+          type: string
+          description: Retry count/strategy value used after copy failure. String.
+        limit_expired_to_market:
+          type: boolean
+          description: Whether expired copied limit orders may fall back to market
+            orders.
+        use_buy_order_book:
+          type: boolean
+          description: Whether buy copy uses order-book level settings.
+        buy_bid_level:
+          type: string
+          description: Buy-side bid book level. String.
+        buy_ask_level:
+          type: string
+          description: Buy-side ask book level. String.
+        use_sell_order_book:
+          type: boolean
+          description: Whether sell copy uses order-book level settings.
+        sell_bid_level:
+          type: string
+          description: Sell-side bid book level. String.
+        sell_ask_level:
+          type: string
+          description: Sell-side ask book level. String.
+        buy_order_book_mode:
+          type: string
+          description: Buy-side order-book mode. String.
+        sell_order_book_mode:
+          type: string
+          description: Sell-side order-book mode. String.
+        turbo_mode:
+          type: boolean
+          description: Whether to enable turbo mode for this config.
+        status:
+          "$ref": "#/components/schemas/CopytradeStatus"
+    CopytradeMarketTypesInput:
+      type: object
+      required:
+      - config_type
+      description: Market-type switches used by `OnlyCopyMarketsTypes`. For switch
+        fields, `1` means enabled and `2` means disabled; omitted fields are not changed.
+      properties:
+        all:
+          type: integer
+          enum:
+          - 1
+          - 2
+          description: "`all`; enables or disables copying all supported market types."
+        sports:
+          type: integer
+          enum:
+          - 1
+          - 2
+          description: "`sports`; enables or disables sports markets."
+        crypto:
+          type: integer
+          enum:
+          - 1
+          - 2
+          description: "`crypto`; enables or disables crypto markets as a group."
+        crypto_m5:
+          type: integer
+          enum:
+          - 1
+          - 2
+          description: "`crypto_m5`; enables or disables 5-minute crypto markets."
+        crypto_m15:
+          type: integer
+          enum:
+          - 1
+          - 2
+          description: "`crypto_m15`; enables or disables 15-minute crypto markets."
+        crypto_h1:
+          type: integer
+          enum:
+          - 1
+          - 2
+          description: "`crypto_h1`; enables or disables 1-hour crypto markets."
+        crypto_h4:
+          type: integer
+          enum:
+          - 1
+          - 2
+          description: "`crypto_h4`; enables or disables 4-hour crypto markets."
+        crypto_btc:
+          type: integer
+          enum:
+          - 1
+          - 2
+          description: "`crypto_btc`; enables or disables BTC crypto markets."
+        crypto_eth:
+          type: integer
+          enum:
+          - 1
+          - 2
+          description: "`crypto_eth`; enables or disables ETH crypto markets."
+        crypto_sol:
+          type: integer
+          enum:
+          - 1
+          - 2
+          description: "`crypto_sol`; enables or disables SOL crypto markets."
+        crypto_xrp:
+          type: integer
+          enum:
+          - 1
+          - 2
+          description: "`crypto_xrp`; enables or disables XRP crypto markets."
+        politics:
+          type: integer
+          enum:
+          - 1
+          - 2
+          description: "`politics`; enables or disables politics markets."
+        weather:
+          type: integer
+          enum:
+          - 1
+          - 2
+          description: "`weather`; enables or disables weather markets."
+        other:
+          type: integer
+          enum:
+          - 1
+          - 2
+          description: "`other`; enables or disables uncategorized/other markets."
+        config_type:
+          type: integer
+          enum:
+          - 1
+          - 2
+          description: "`config_type`; `1` means an application copytrade config,
+            `2` means a template config."
+    CopytradeConfigUpdateInput:
+      type: object
+      properties:
+        target_address:
+          type: string
+          description: Optional on PATCH. Trader wallet address to follow; when omitted
+            the existing target address is not changed.
+        tag:
+          type: string
+          description: User-visible label for this copytrade config.
+        copy_percentage:
+          type: string
+          description: Percentage of the trader's order size to copy. Decimal string;
+        limit_order_copy:
+          type: boolean
+          description: Whether to copy buy limit orders. On PATCH, specify the desired
+            final state.
+        limit_order_validity_period:
+          type: string
+          description: Validity period for copied buy limit orders. Decimal/integer
+            string.
+        max_limit_order_price_diff:
+          type: string
+          description: Maximum allowed price difference for copied buy limit orders.
+            Decimal string.
+        max_token_spend:
+          type: string
+          description: Maximum token spend cap for this config. Decimal string.
+        total_token_spend:
+          type: string
+          description: Total token spend cap for this config. Decimal string.
+        buy_at_min:
+          type: boolean
+          description: Whether buy copy should use minimum-price behavior.
+        copy_fixed_amount:
+          type: string
+          description: Fixed amount to copy per trade. Decimal string.
+        min_trader_trade_amount:
+          type: string
+          description: Minimum source trader trade amount required before copying.
+            Decimal string.
+        max_trader_trade_amount:
+          type: string
+          description: Maximum source trader trade amount allowed for copying. Decimal
+            string.
+        min_copy_amount_per_trade:
+          type: string
+          description: Minimum copied amount per trade. Decimal string.
+        max_copy_amount_per_trade:
+          type: string
+          description: Maximum copied amount per trade. Decimal string.
+        min_price:
+          type: string
+          description: Minimum market/order price allowed for copying. Decimal string.
+        max_price:
+          type: string
+          description: Maximum market/order price allowed for copying. Decimal string.
+        slippage:
+          type: string
+          description: Buy-side market-order slippage tolerance. Decimal string.
+        max_spend_per_market:
+          type: string
+          description: Maximum spend cap per market. Decimal string.
+        max_holder_market_number:
+          type: string
+          description: Maximum number of holder markets allowed. Integer string.
+        take_profit_percentage:
+          type: string
+          description: Take-profit trigger percentage. Decimal string.
+        take_profit_price:
+          type: string
+          description: Take-profit trigger price. Decimal string.
+        stop_loss_percentage:
+          type: string
+          description: Stop-loss trigger percentage. Decimal string.
+        stop_loss_price:
+          type: string
+          description: Stop-loss trigger price. Decimal string.
+        copy_buy:
+          type: boolean
+          description: Whether buy trades are copied. On PATCH, specify the desired
+            final state.
+        copy_sell:
+          type: boolean
+          description: Whether sell trades are copied. On PATCH, specify the desired
+            final state.
+        market_sell_slippage:
+          type: string
+          description: Sell-side market-order slippage tolerance. Decimal string.
+        sell_limit_order_copy:
+          type: boolean
+          description: Whether to copy sell limit orders. On PATCH, specify the desired
+            final state.
+        sell_limit_order_price_diff:
+          type: string
+          description: Maximum allowed price difference for copied sell limit orders.
+            Decimal string.
+        sell_limit_order_validity_period:
+          type: string
+          description: Validity period for copied sell limit orders. Decimal/integer
+            string.
+        max_5m_market_start_time:
+          type: string
+          description: Earliest allowed start-time window for 5-minute markets. String.
+        max_5m_market_end_time:
+          type: string
+          description: Latest allowed end-time window for 5-minute markets. String.
+        max_15m_market_start_time:
+          type: string
+          description: Earliest allowed start-time window for 15-minute markets. String.
+        max_15m_market_end_time:
+          type: string
+          description: Latest allowed end-time window for 15-minute markets. String.
+        tp_balance_threshold:
+          type: string
+          description: Balance threshold used by take-profit logic. Decimal string.
+        sl_balance_threshold:
+          type: string
+          description: Balance threshold used by stop-loss logic. Decimal string.
+        reverse_copy:
+          type: boolean
+          description: Whether to invert copied trade direction. On PATCH, specify
+            the desired final state.
+        keyword_whitelist:
+          description: Not accepted on PATCH. Use POST `/copytrade/configs/{config_id}/keywords`.
+          readOnly: true
+          type: array
+          items:
+            type: string
+        keyword_blacklist:
+          description: Not accepted on PATCH. Use POST `/copytrade/configs/{config_id}/keywords`.
+          readOnly: true
+          type: array
+          items:
+            type: string
+        failure_retry:
+          type: string
+          description: Retry count/strategy value used after copy failure. String.
+        limit_expired_to_market:
+          type: boolean
+          description: Whether expired copied limit orders may fall back to market
+            orders.
+        use_buy_order_book:
+          type: boolean
+          description: Whether buy copy uses order-book level settings.
+        buy_bid_level:
+          type: string
+          description: Buy-side bid book level. String.
+        buy_ask_level:
+          type: string
+          description: Buy-side ask book level. String.
+        use_sell_order_book:
+          type: boolean
+          description: Whether sell copy uses order-book level settings.
+        sell_bid_level:
+          type: string
+          description: Sell-side bid book level. String.
+        sell_ask_level:
+          type: string
+          description: Sell-side ask book level. String.
+        buy_order_book_mode:
+          type: string
+          description: Buy-side order-book mode. String.
+        sell_order_book_mode:
+          type: string
+          description: Sell-side order-book mode. String.
+        turbo_mode:
+          type: boolean
+          description: Whether to enable turbo mode for this config.
+        status:
+          "$ref": "#/components/schemas/CopytradeStatus"
+    CopytradeKeywordInput:
+      type: object
+      required:
+      - key_word
+      - list_type
+      - config_type
+      properties:
+        key_word:
+          type: string
+          description: Keyword text to add to the config keyword list.
+        list_type:
+          type: integer
+          enum:
+          - 1
+          - 2
+          description: "`list_type`; `1` means whitelist, `2` means blacklist."
+        config_type:
+          type: integer
+          enum:
+          - 1
+          description: Must be 1 (application copytrade config); templates are not
+            supported by this HTTP endpoint.
+    CopytradeKeywordResult:
+      type: object
+      additionalProperties: false
+      required:
+      - code
+      properties:
+        code:
+          type: string
+          description: keyword advisory code. Empty string means no advisory; KEYWORD_IN_BLACKLIST
+            means the keyword also appears in the blacklist. This is not the outer
+            API response code.
+    CopytradeMutationResult:
+      type: object
+      additionalProperties: false
+      description: Empty object acknowledging a successful keyword deletion or market-type
+        update.
+    CopytradeMarketTypesUpdateInput:
+      allOf:
+      - "$ref": "#/components/schemas/CopytradeMarketTypesInput"
+      - type: object
+        properties:
+          config_type:
+            type: integer
+            enum:
+            - 1
+            description: Must be 1 (application copytrade config); templates are not
+              supported by this HTTP endpoint.
+    AFKStrategyList:
+      type: object
+      required:
+      - items
+      properties:
+        items:
+          type: array
+          items:
+            "$ref": "#/components/schemas/AFKStrategy"
+    AFKStrategy:
+      allOf:
+      - "$ref": "#/components/schemas/AFKStrategyInput"
+      - type: object
+        required:
+        - config_id
+        - status
+        properties:
+          config_id:
+            type: string
+            description: AFK strategy id from `config_id`.
+          status:
+            "$ref": "#/components/schemas/AFKStatus"
+          created_at:
+            type: string
+            format: date-time
+            nullable: true
+            description: Strategy create time derived from `create_dt`.
+    AFKStrategyInput:
+      type: object
+      required:
+      - market
+      - side
+      - buy_amount
+      properties:
+        tag:
+          type: string
+          description: User-visible strategy label.
+        market:
+          type: string
+          description: Market identifier or market group configured for the AFK strategy.
+        period:
+          type: integer
+          description: Trading period/window value.
+        side:
+          type: integer
+          enum:
+          - 1
+          - 2
+          description: Direction filter; `1` means Up, `2` means Down.
+        time_start_sec:
+          type: integer
+          format: int64
+          description: Start time in Unix seconds.
+        time_end_sec:
+          type: integer
+          format: int64
+          description: End time in Unix seconds.
+        min_price:
+          type: string
+          description: Minimum allowed price. Decimal string.
+        max_price:
+          type: string
+          description: Maximum allowed price. Decimal string.
+        price_delta_min:
+          type: string
+          description: Minimum price delta filter. Decimal string.
+        price_delta_max:
+          type: string
+          description: Maximum price delta filter. Decimal string.
+        buy_amount:
+          type: string
+          description: Buy amount per AFK order. Decimal string.
+        limit_price:
+          type: string
+          description: Limit order price when `limit_order_copy=1`. Decimal string.
+        order_expired_ttl_seconds:
+          type: integer
+          description: Limit order expiration TTL in seconds.
+        total_rounds:
+          type: integer
+          description: Maximum number of AFK trading rounds.
+        take_profit_percentage:
+          type: string
+          description: Take-profit percentage trigger. Decimal string.
+        take_profit_price:
+          type: string
+          description: Take-profit price trigger. Decimal string.
+        stop_loss_percentage:
+          type: string
+          description: Stop-loss percentage trigger. Decimal string.
+        stop_loss_price:
+          type: string
+          description: Stop-loss price trigger. Decimal string.
+        limit_order_copy:
+          type: integer
+          enum:
+          - 0
+          - 1
+          description: Order mode; `0` means market order, `1` means limit order.
+        slippage:
+          type: string
+          description: Market order slippage percentage string, for example `2` means
+            2%.
+        use_kdj:
+          type: integer
+          enum:
+          - 0
+          - 1
+          description: KDJ indicator filter switch; `0` disabled, `1` enabled.
+        use_macd:
+          type: integer
+          enum:
+          - 0
+          - 1
+          description: MACD indicator filter switch; `0` disabled, `1` enabled.
+        use_atr:
+          type: integer
+          enum:
+          - 0
+          - 1
+          description: ATR indicator filter switch; `0` disabled, `1` enabled.
+    AFKStatus:
+      type: string
+      enum:
+      - running
+      - paused
+      - disabled
+      description: Public AFK strategy status.
+    AFKStrategyCreateResult:
+      type: object
+      required:
+      - status
+      description: Creation acknowledgement without a strategy ID. Call GET /afk/strategies
+        to read the created strategy.
+      properties:
+        status:
+          type: string
+          enum:
+          - created
+    AFKStrategyUpdateInput:
+      allOf:
+      - "$ref": "#/components/schemas/AFKStrategyInput"
+      - type: object
+        properties:
+          status:
+            "$ref": "#/components/schemas/AFKStatus"
+    AFKRecordList:
+      type: object
+      required:
+      - items
+      properties:
+        items:
+          type: array
+          items:
+            "$ref": "#/components/schemas/AFKRecord"
+        next_cursor:
+          type: string
+          nullable: true
+          description: Cursor for the next page. Use it as the next request's `cursor`.
+    AFKRecord:
+      type: object
+      additionalProperties: true
+      description: AFK transaction record.
+      properties:
+        record_id:
+          type: string
+        strategy_id:
+          type: integer
+          format: uint64
+          description: JavaScript clients must use lossless integer parsing and store
+            this value as a bigint or decimal string in application state.
+        round_id:
+          type: integer
+          format: int64
+        wallet_address:
+          type: string
+        proxy_address:
+          type: string
+        tag:
+          type: string
+        trigger_asset_price:
+          type: string
+        trigger_btc_price:
+          type: string
+        trigger_btc_delta:
+          type: string
+        title:
+          type: string
+        event_slug:
+          type: string
+        slug:
+          type: string
+        conditional_id:
+          type: string
+        outcome:
+          type: string
+        asset:
+          type: string
+        closed:
+          type: boolean
+        side_type:
+          type: string
+        px:
+          type: string
+        amount:
+          type: string
+        amount_usd:
+          type: string
+        order_id:
+          type: string
+        hash:
+          type: string
+        timestamp:
+          type: integer
+          format: uint64
+        order_type:
+          type: string
+        status:
+          type: integer
+          enum:
+          - 1
+          - 2
+          - 3
+          - 4
+          - 5
+          description: 'Record status: 1=success, 2=failed, 3=waiting, 4=cancel, 5=partially.
+            For failed records (`2`), read `error_msg` for the failure reason.'
+        take_profit_percentage:
+          type: string
+        take_profit_price:
+          type: string
+        stop_loss_percentage:
+          type: string
+        stop_loss_price:
+          type: string
+        slippage:
+          type: string
+        spend_req_micro:
+          type: integer
+          format: uint64
+        spend_granted_micro:
+          type: integer
+          format: uint64
+        size_matched:
+          type: string
+        error_msg:
+          type: string
+          nullable: true
+          description: Failure reason when `status=2`, if returned by the service.
+        create_dt:
+          type: integer
+          format: uint64
+        update_dt:
+          type: integer
+          format: uint64
+    CopytradeRecordList:
+      type: object
+      required:
+      - items
+      properties:
+        items:
+          type: array
+          items:
+            "$ref": "#/components/schemas/CopytradeRecord"
+        next_cursor:
+          type: string
+          nullable: true
+    CopytradeRecord:
+      type: object
+      additionalProperties: true
+      required:
+      - outcome
+      description: Copytrade transaction record.
+      properties:
+        record_id:
+          type: string
+        config_id:
+          type: string
+          pattern: "^[0-9]+$"
+          description: Unsigned integer ID encoded as a decimal string.
+        order_id:
+          type: string
+          nullable: true
+        status:
+          type: integer
+          format: uint32
+          enum:
+          - 1
+          - 2
+          - 3
+          - 4
+          - 5
+          description: 'Record status: 1=success, 2=failed, 3=waiting, 4=cancel, 5=partially.
+            For failed records (`2`), read `error_msg` when returned by the service.'
+        error_msg:
+          type: string
+          nullable: true
+          description: Failure reason when `status=2`, if returned by the service.
+        market:
+          type: string
+        outcome:
+          type: string
+          description: Stored outcome label (for example Yes, No, or a team name).
+            Empty string when unavailable.
+        target_price:
+          type: string
+        target_amount:
+          type: string
+        target_amount_usd:
+          type: string
+        copy_price:
+          type: string
+        copy_amount:
+          type: string
+        copy_amount_usd:
+          type: string
+        side:
+          type: string
+        create_dt:
+          type: string
+          pattern: "^[0-9]+$"
+          description: Unix seconds encoded as a decimal string.
+        created_at:
+          type: string
+          format: date-time
+          deprecated: true
+          description: Legacy response field. Use create_dt in new responses.
+    WebTradingReadiness:
+      type: object
+      required:
+      - account_status
+      - wallet_status
+      - two_fa_enabled
+      - can_view_markets
+      - can_view_wallet
+      - can_place_order
+      - can_cancel_order
+      - can_withdraw
+      - blocking_reasons
+      properties:
+        account_status:
+          type: string
+          enum:
+          - active
+          - disabled
+        wallet_status:
+          type: string
+          enum:
+          - ready
+          - unavailable
+          - not_initialized
+          - unknown
+          x-enum-varnames:
+          - WebTradingReadinessWalletStatusReady
+          - WebTradingReadinessWalletStatusUnavailable
+          - WebTradingReadinessWalletStatusNotInitialized
+          - WebTradingReadinessWalletStatusUnknown
+        two_fa_enabled:
+          type: boolean
+        can_view_markets:
+          type: boolean
+        can_view_wallet:
+          type: boolean
+        can_place_order:
+          type: boolean
+        can_cancel_order:
+          type: boolean
+        can_withdraw:
+          type: boolean
+        blocking_reasons:
+          type: array
+          items:
+            "$ref": "#/components/schemas/WebTradingBlockingReason"
+    WebTradingBlockingReason:
+      type: string
+      enum:
+      - ACCOUNT_DISABLED
+      - WALLET_UNAVAILABLE
+      - WALLET_NOT_INITIALIZED
+      - BALANCE_UNAVAILABLE
+      - TWO_FA_REQUIRED_FOR_WITHDRAW
+      - API_KEY_IP_WHITELIST_REQUIRED
+      - API_KEY_SCOPE_REQUIRED
+      - USER_API_KEY_WITHDRAW_DISABLED
+      - TG_WITHDRAW_DISABLED
+      - TRADING_TEMPORARILY_RESTRICTED
+      - DEPENDENCY_UNAVAILABLE
+    ClosedPositionList:
+      type: object
+      required:
+      - items
+      properties:
+        items:
+          type: array
+          items:
+            "$ref": "#/components/schemas/ClosedPosition"
+    ClosedPosition:
+      type: object
+      required:
+      - proxy_wallet
+      - asset
+      - condition_id
+      - avg_price
+      - total_bought
+      - realized_pnl
+      - cur_price
+      - timestamp
+      - title
+      - slug
+      - icon
+      - event_slug
+      - outcome
+      - outcome_index
+      - opposite_outcome
+      - opposite_asset
+      - end_date
+      properties:
+        proxy_wallet:
+          type: string
+        asset:
+          type: string
+        condition_id:
+          type: string
+        avg_price:
+          type: string
+        total_bought:
+          type: string
+        realized_pnl:
+          type: string
+        cur_price:
+          type: string
+        timestamp:
+          type: integer
+          format: int64
+        title:
+          type: string
+        slug:
+          type: string
+        icon:
+          type: string
+        event_slug:
+          type: string
+        outcome:
+          type: string
+        outcome_index:
+          type: integer
+          format: int64
+        opposite_outcome:
+          type: string
+        opposite_asset:
+          type: string
+        end_date:
+          type: string
+    UserActivityList:
+      type: object
+      required:
+      - items
+      properties:
+        items:
+          type: array
+          items:
+            "$ref": "#/components/schemas/UserActivity"
+    UserActivity:
+      type: object
+      required:
+      - proxy_wallet
+      - timestamp
+      - condition_id
+      - type
+      - size
+      - usdc_size
+      - transaction_hash
+      - price
+      - asset
+      - side
+      - outcome_index
+      - title
+      - slug
+      - icon
+      - event_slug
+      - outcome
+      - name
+      - pseudonym
+      - bio
+      - profile_image
+      - profile_image_optimized
+      - is_combo
+      properties:
+        proxy_wallet:
+          type: string
+        timestamp:
+          type: integer
+          format: int64
+        condition_id:
+          type: string
+        type:
+          type: string
+        size:
+          type: string
+        usdc_size:
+          type: string
+        transaction_hash:
+          type: string
+        price:
+          type: string
+        asset:
+          type: string
+        side:
+          type: string
+        outcome_index:
+          type: integer
+          format: int64
+        title:
+          type: string
+        slug:
+          type: string
+        icon:
+          type: string
+        event_slug:
+          type: string
+        outcome:
+          type: string
+        name:
+          type: string
+        pseudonym:
+          type: string
+        bio:
+          type: string
+        profile_image:
+          type: string
+        profile_image_optimized:
+          type: string
+        is_combo:
+          type: boolean
+    RedeemPositionRequest:
+      type: object
+      required:
+      - condition_id
+      properties:
+        condition_id:
+          type: string
+          minLength: 66
+          maxLength: 66
+          pattern: "^0x[0-9a-fA-F]{64}$"
+          description: Condition id from a position returned by `GET /positions?redeemable=true`.
+    RedeemPositionResult:
+      type: object
+      required:
+      - condition_id
+      - status
+      properties:
+        condition_id:
+          type: string
+        status:
+          type: string
+          enum:
+          - accepted
+    AutoClaimSetting:
+      type: object
+      required:
+      - auto_claim
+      properties:
+        auto_claim:
+          type: boolean
+    AutoClaimSettingRequest:
+      type: object
+      required:
+      - auto_claim
+      properties:
+        auto_claim:
+          type: boolean
+          description: Desired automatic redemption state. `true` enables automatic
+            redemption; `false` disables it.
+  responses:
+    BadRequest:
+      description: Bad request
+      content:
+        application/json:
+          schema:
+            "$ref": "#/components/schemas/ErrorResponse"
+    Unauthorized:
+      description: Authentication failed
+      content:
+        application/json:
+          schema:
+            "$ref": "#/components/schemas/ErrorResponse"
+    Forbidden:
+      description: Forbidden
+      content:
+        application/json:
+          schema:
+            "$ref": "#/components/schemas/ErrorResponse"
+    Conflict:
+      description: Conflict
+      content:
+        application/json:
+          schema:
+            "$ref": "#/components/schemas/ErrorResponse"
+    RateLimited:
+      description: Rate limited
+      headers:
+        Retry-After:
+          description: Seconds to wait before retrying the same rate-limited bucket.
+          schema:
+            type: integer
+            minimum: 1
+        X-RateLimit-Limit:
+          description: Effective limit for the bucket that rejected the request.
+          schema:
+            type: integer
+            minimum: 1
+        X-RateLimit-Remaining:
+          description: Remaining tokens in the bucket that rejected the request. Usually
+            0 on 429.
+          schema:
+            type: integer
+            minimum: 0
+        X-RateLimit-Reset:
+          description: Seconds until the bucket is expected to accept another request.
+          schema:
+            type: integer
+            minimum: 1
+      content:
+        application/json:
+          schema:
+            "$ref": "#/components/schemas/ErrorResponse"
+    InternalServerError:
+      description: Internal server error
+      content:
+        application/json:
+          schema:
+            "$ref": "#/components/schemas/ErrorResponse"
+    DependencyUnavailable:
+      description: Service temporarily unavailable
+      content:
+        application/json:
+          schema:
+            "$ref": "#/components/schemas/ErrorResponse"
+    NotFound:
+      description: Not found
+      content:
+        application/json:
+          schema:
+            "$ref": "#/components/schemas/ErrorResponse"
+    ActionResultUnavailable:
+      description: The API cannot confirm the operation's result. A 503 does not prove
+        non-execution. Preserve the original key and request, confirm the outcome,
+        and never automatically submit under a new key. Configuration and redemption
+        operations can also return ORDER_RESULT_UNKNOWN; do not assume an exchange
+        order ID or business_request_id exists for those operations.
+      content:
+        application/json:
+          schema:
+            "$ref": "#/components/schemas/ErrorResponse"
+    ValidationFailed:
+      description: Validation failed
+      content:
+        application/json:
+          schema:
+            "$ref": "#/components/schemas/ErrorResponse"
+  headers:
+    NoStore:
+      schema:
+        type: string
+        enum:
+        - no-store

@@ -1,0 +1,195 @@
+---
+title: "Authenticate API requests with HMAC-SHA256 signing"
+sidebarTitle: "Authentication"
+description: "Every PolyCop OpenAPI request requires four signed headers."
+---
+
+These endpoints use API keys and HMAC-SHA256 signatures.
+
+## Required headers
+
+Send these four headers on every request:
+
+<ParamField header="X-API-Key" type="string" required>
+  Your API key ID, in the format `pk_...`.
+</ParamField>
+
+<ParamField header="X-Timestamp" type="integer" required>
+  Unix timestamp in seconds. The default allowed clock skew is 15 seconds in either direction. Deployment configuration may override it.
+</ParamField>
+
+<ParamField header="X-Nonce" type="string" required>
+  A random string unique for each request under the same API key. Use at least
+  16 random bytes, hex encoded.
+</ParamField>
+
+<ParamField header="X-Signature" type="string" required>
+  The HMAC-SHA256 hex digest of the canonical string.
+</ParamField>
+
+## Canonical string
+
+Build the canonical string before computing `X-Signature`. The server repeats these steps to verify your signature.
+
+The canonical string format is:
+
+```
+METHOD + "\n" + PATH + "\n" + QUERY + "\n" + TIMESTAMP + "\n" + NONCE + "\n" + BODY_SHA256
+```
+
+Use these values:
+
+| Component | Description |
+|---|---|
+| `METHOD` | Uppercase HTTP verb: `GET`, `POST`, `PUT`, `PATCH`, or `DELETE`. |
+| `PATH` | The full request path including the `/openapi/v1` prefix, e.g. `/openapi/v1/wallet`. |
+| `QUERY` | The canonical query: RFC3986-encode keys and values, sort encoded keys and each key's encoded values, then join `key=value` pairs with `&`. Encode spaces as `%20`, not `+`. Omit the leading `?`; use an empty string for no query. |
+| `TIMESTAMP` | The exact same integer value you send in the `X-Timestamp` header. |
+| `NONCE` | The exact same string value you send in the `X-Nonce` header. |
+| `BODY_SHA256` | The SHA-256 hex digest of the raw request body bytes. For requests with no body (e.g. `GET`), compute the SHA-256 of the empty string: `e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855`. |
+
+Send each scalar query parameter once. Repeated scalar keys (even with identical values), malformed percent encoding, and unescaped query semicolons return `400 BAD_REQUEST`. Parameter names are compared after decoding, so `locale` and `loc%61le` count as the same key.
+
+Only these GET array parameters accept repeated keys: `/positions`: `market`; `/closed-positions`: `market`, `eventId`; `/activity`: `market`, `eventId`, `type`. Existing CSV array values remain supported. Canonical sorting and HMAC computation are unchanged.
+
+Sign the canonical string with your API secret:
+
+```
+X-Signature = HMAC-SHA256(secret_key, canonical_string).hex()
+```
+
+<Note>
+  Hash the raw request body bytes. Do not hash a pretty-printed or re-serialized
+  version of the body.
+</Note>
+
+## Canonical string examples
+
+### GET request with no body or query string
+
+For `GET /openapi/v1/wallet` with timestamp `1717200000` and nonce `abc123randomnonce`:
+
+```
+GET
+/openapi/v1/wallet
+
+1717200000
+abc123randomnonce
+e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+```
+
+The third line is blank because there is no query string. `BODY_SHA256` is the SHA-256 hash of an empty string.
+
+### POST request with a JSON body
+
+For `POST /openapi/v1/orders` with body `{"asset":"123456789","side":"buy","amount_usd":"10"}`, timestamp `1717200001`, and nonce `xyz789anothernonce`:
+
+```
+POST
+/openapi/v1/orders
+
+1717200001
+xyz789anothernonce
+<sha256 of body bytes>
+```
+
+Replace `<sha256 of body bytes>` with the SHA-256 hex digest of the UTF-8 encoded body before signing.
+
+### GET request, with query string
+
+For `GET /openapi/v1/orders?locale=en`, the query component is `locale=en`:
+
+```
+GET
+/openapi/v1/orders
+locale=en
+1717200002
+def456yetanothernonce
+e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+```
+
+## Timestamp skew
+
+The server accepts timestamps within a limited window to restrict replay:
+
+- By default, your `X-Timestamp` must be within 15 seconds of server time in either direction. Confirm any deployment override with PolyCop.
+- If the timestamp falls outside this window, the server rejects the request with `API_KEY_TIMESTAMP_EXPIRED`.
+- Use a time-synchronized clock source, such as NTP, on your signing host to avoid drift. Cloud environments usually synchronize automatically; embedded or local systems may require explicit NTP configuration.
+
+## Nonce rules
+
+A nonce ("number used once") prevents an attacker who intercepts a valid request from replaying it:
+
+- Use a unique nonce for each request under the same API key. Changing `X-Timestamp` does not let you reuse a nonce.
+- Replaying a nonce within the timestamp window is rejected with HTTP `409` and `API_KEY_NONCE_REPLAYED`.
+- Generate nonces using a cryptographically secure random source. For example, use 16 or more random bytes encoded as a lowercase hex string. This produces a string of at least 32 characters.
+
+<Tip>
+  You can use a UUID v4 as a nonce. It provides the required randomness and is
+  easy to find in logs.
+</Tip>
+
+## Retry behaviour
+
+<Warning>
+  Generate a fresh `X-Timestamp`, `X-Nonce`, and `X-Signature` for every retry,
+  including idempotent requests. The previous timestamp may have expired, and
+  the nonce may already be consumed. To retry the same write, keep its
+  `Idempotency-Key` and `X-API-Key` while refreshing the three signing headers.
+</Warning>
+
+See [Idempotency](/concepts/idempotency) for guidance on retrying state-changing requests.
+
+## Key lifetime
+
+Key lifetimes are capped at 180 days from creation. User keys also inherit the issuing Partner Key deadline. An explicit `expires_at` may shorten the lifetime; resetting the secret does not extend it. See [key expiration and rotation](/concepts/partner-api#key-expiration-and-rotation) when rotating keys.
+
+## Source IP policy
+
+The API requires a nonempty `ip_whitelist` for every HMAC write request. Configure your backend egress IP addresses or CIDRs when requesting a key. An empty whitelist permits reads only; a configured whitelist restricts both reads and writes. Invalid policies or unmatched source addresses return `403 FORBIDDEN`. Do not rely on forwarding headers to choose your source IP.
+
+## Protect your signing secret
+
+Keep signing credentials on your backend. HMAC lets the server check that the signed request has not changed, while timestamps and nonces limit replay. Someone with your key ID and secret can still sign new requests. An IP whitelist blocks them only if they cannot send from an allowed address.
+
+Treat a leaked Partner Key as a potential compromise of its managed users. See [Partner key compromise](/concepts/partner-api#partner-key-compromise) for what an attacker could do and how to respond.
+
+## API key scopes
+
+Each API key has scopes that control which endpoints it can call. If the key does not have the required scope, the API returns HTTP `403` with `FORBIDDEN`.
+
+| Scope | Description |
+|---|---|
+| `trade:read` | Read orders |
+| `trade:order` | Place orders |
+| `trade:cancel` | Cancel orders |
+| `wallet:read` | Read wallet balances |
+| `withdraw:create` | Create Polygon withdrawals |
+| `positions:read` | Read open and closed positions |
+| `trading:read` | Check readiness for the current key |
+| `activity:read` | Read account activity |
+| `positions:redeem` | Request position redemption |
+| `settings:read` | Read auto-claim settings |
+| `settings:manage` | Update auto-claim settings |
+| `copytrade:read` | Read copytrade configs and records |
+| `copytrade:manage` | Create, update, and delete copytrade configs |
+| `afk:read` | Read AFK strategies and records |
+| `afk:manage` | Create and update AFK strategies |
+
+<Note>
+  Withdrawals also require a valid 2FA code in the request body. Use your
+  account security flow to set up 2FA before creating withdrawals. Partner user keys cannot withdraw. See [Partner API](/concepts/partner-api) for default and explicitly granted scopes.
+</Note>
+
+## Authentication error codes
+
+If authentication fails, the server returns one of the following error codes:
+
+| Error code | Meaning |
+|---|---|
+| `UNAUTHORIZED` | The request lacks valid authentication credentials. |
+| `FORBIDDEN` | The key type, scope, or source IP policy does not allow this request. |
+| `API_KEY_INVALID` | The API key is missing, unknown, inactive, revoked, or expired. |
+| `API_KEY_SIGNATURE_INVALID` | The `X-Signature` does not match the server's recomputed HMAC-SHA256 of the canonical string. |
+| `API_KEY_TIMESTAMP_EXPIRED` | The `X-Timestamp` is outside the configured window (default ±15 seconds). |
+| `API_KEY_NONCE_REPLAYED` | The same key has already used this nonce during its retention period. |

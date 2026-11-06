@@ -1,0 +1,135 @@
+---
+title: "PolyCop OpenAPI quickstart: Sign and call the API"
+sidebarTitle: "Quickstart"
+description: "Receive an API key, sign a request, and call GET /wallet."
+---
+
+<Note>All URLs and examples on this page use the test environment, not production. Use test credentials and wallets.</Note>
+
+Get an API key, sign a `GET /wallet` request, and check the response.
+
+<Steps>
+
+<Step title="Get an API key">
+
+Contact PolyCop to receive a direct account key or a Partner Key. For a multi-user integration, follow [Partner API](/concepts/partner-api) to provision users and issue their keys before making user trading requests.
+
+Your API credentials have two parts:
+
+| Part | Prefix | Description |
+|---|---|---|
+| `key_id` | `pk_` | The public identifier sent in the `X-API-Key` header |
+| `secret` | `sk_` | The private secret used to sign requests |
+
+<Warning>
+  The `secret` is shown only once. Save it in a secrets manager when you receive the response.
+</Warning>
+
+API keys have scopes such as `trade:order` and `wallet:read`. Request the scopes your integration needs. Write scopes also require a nonempty `ip_whitelist` with your backend egress IP addresses or CIDRs.
+
+</Step>
+
+<Step title="Sign the request with HMAC-SHA256">
+
+Every request must include four authentication headers. The API checks the signature before it processes the request.
+
+| Header | Value |
+|---|---|
+| `X-API-Key` | Your `key_id` (e.g., `pk_...`) |
+| `X-Timestamp` | Current Unix timestamp in **seconds** (integer) |
+| `X-Nonce` | A random string unique within the timestamp window |
+| `X-Signature` | HMAC-SHA256 hex digest of the canonical string (see below) |
+
+### Building the canonical string
+
+Join these fields with newline characters (`\n`):
+
+```
+METHOD + "\n" + PATH + "\n" + QUERY + "\n" + TIMESTAMP + "\n" + NONCE + "\n" + BODY_SHA256
+```
+
+| Field | Description |
+|---|---|
+| `METHOD` | Uppercase HTTP method, e.g. `GET` or `POST` |
+| `PATH` | The full request path, e.g. `/openapi/v1/wallet` |
+| `QUERY` | The canonical query string: RFC3986-encode and sort keys and values; use an empty string if there is no query. See [Signing examples](/examples/signing) for the helper |
+| `TIMESTAMP` | The same integer value you put in `X-Timestamp` |
+| `NONCE` | The same random string you put in `X-Nonce` |
+| `BODY_SHA256` | SHA-256 hex digest of the raw request body. For `GET` requests with no body, compute the SHA-256 of an empty string: `e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855` |
+
+### Signing snippet
+
+<CodeGroup>
+
+```typescript TypeScript
+import crypto from 'crypto';
+
+function sign(method: string, path: string, query: string, body: string, secret: string): {
+  timestamp: string;
+  nonce: string;
+  signature: string;
+} {
+  const timestamp = Math.floor(Date.now() / 1000).toString();
+  const nonce = crypto.randomBytes(16).toString('hex');
+  const bodyHash = crypto.createHash('sha256').update(body).digest('hex');
+  const canonical = [method.toUpperCase(), path, query, timestamp, nonce, bodyHash].join('\n');
+  const signature = crypto.createHmac('sha256', secret).update(canonical).digest('hex');
+  return { timestamp, nonce, signature };
+}
+```
+
+</CodeGroup>
+
+Put the returned `timestamp`, `nonce`, and `signature` values into the matching request headers.
+
+<Note>
+  Generate a fresh timestamp, nonce, and signature for each retry. The API rejects reused signing values.
+</Note>
+
+<Tip>
+  [Authentication](/concepts/authentication) covers the allowed clock drift, nonce rules, and how to sign `POST` bodies.
+</Tip>
+
+</Step>
+
+<Step title="Make your first request: GET /wallet">
+
+With an API key and a fresh signature, call `GET /wallet`. It returns the custodial wallet linked to the API key and its balances.
+
+### Request
+
+```bash cURL
+curl -X GET "https://test-eu.polycopy.fun/openapi/v1/wallet" \
+  -H "X-API-Key: pk_your_key_id" \
+  -H "X-Timestamp: 1717200000" \
+  -H "X-Nonce: abc123randomnonce" \
+  -H "X-Signature: <hmac_sha256_hex>"
+```
+
+Replace `pk_your_key_id` with your actual `key_id`, and replace the `X-Timestamp`, `X-Nonce`, and `X-Signature` values with those produced by your signing logic.
+
+### Expected response
+
+A successful request returns HTTP `200`:
+
+```json
+{
+  "code": "OK",
+  "message": "success",
+  "data": {
+    "account_id": "9912345678901234564821",
+    "network": "polygon",
+    "wallet_address": "0xYourWalletAddress",
+    "balances": [
+      { "token": "USDC", "amount": "250.00" }
+    ]
+  },
+  "request_id": "req_202606011200000001"
+}
+```
+
+If `code` is not `OK`, compare your canonical string with the request you sent. Also check that `X-Timestamp` is current.
+
+</Step>
+
+</Steps>

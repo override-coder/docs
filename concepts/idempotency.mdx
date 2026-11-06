@@ -1,0 +1,81 @@
+---
+title: "Idempotency keys"
+sidebarTitle: "Idempotency"
+description: "Use idempotency keys to retry writes and recover results when a request times out."
+---
+
+Generate an `Idempotency-Key` before sending an operation that needs one. Save it with the exact request body. For a retry, keep that key and body, and generate a fresh `X-Timestamp`, `X-Nonce`, and `X-Signature`. Keep the same API key. See [Authentication](/concepts/authentication).
+
+## Required endpoints
+
+Paths are relative to `/openapi/v1`. Missing a required header returns HTTP `400`.
+
+| Endpoint | Operation |
+|---|---|
+| `POST /orders` | Place an order |
+| `POST /wallet/withdraw` | Create an eligible account's withdrawal |
+| `POST /copytrade/configs` | Create a copytrade config |
+| `PATCH /copytrade/configs/{config_id}` | Update a copytrade config |
+| `DELETE /copytrade/configs/{config_id}` | Disable a copytrade config |
+| `POST /copytrade/configs/{config_id}/keywords` | Add a keyword |
+| `DELETE /copytrade/configs/{config_id}/keywords/{key_word_id}` | Delete a keyword |
+| `PATCH /copytrade/configs/{config_id}/market-types` | Update market types |
+| `POST /afk/strategies` | Create an AFK strategy |
+| `PATCH /afk/strategies/{strategy_id}` | Update an AFK strategy |
+| `POST /positions/redeem` | Request redemption |
+| `PUT /settings/auto-claim` | Set auto-claim |
+
+See [Trading integration](/concepts/api-parity) for copytrade, AFK, redemption, and auto-claim request details.
+
+The header is optional for `DELETE /orders/{order_id}` and `POST /partner/users/{user_account_id}/api-keys`. Use it when a retry could duplicate an action.
+
+## Key format and scope
+
+<ParamField header="Idempotency-Key" type="string">
+  A unique string of up to 128 characters for one logical operation. Use a UUID v4 or your stored business identifier, such as `order-550e8400-e29b-41d4-a716-446655440000`.
+</ParamField>
+
+For configuration and redemption requests, the server identifies retries by account, credential, HTTP method, path, and key. It treats requests using different credentials separately. For order creation and withdrawals, idempotency applies across credentials belonging to the same account.
+
+The server checks the current key's permissions before replaying a cached response. An old cached success does not bypass revoked permissions.
+
+For generic configuration operations, completed responses are normally retained for 24 hours. Processing, unknown, and legacy failed records remain blocked instead of automatically executing again. Do not assume that a key provides indefinite deduplication after a completed record expires.
+
+## Handle a retry
+
+- If the operation completed, the server can return its stored response for the same key and request.
+- If you reuse the key with a different body, the server returns HTTP `409` with `CONFLICT`.
+- If the operation is processing or blocked, keep the request and key while you check the outcome. Do not create another key automatically.
+- If validation definitely failed, correct the request and use a new key for the corrected operation. A concurrent auto-claim update may return `CONFLICT`; refresh the setting before deciding whether to send another update.
+
+<Warning>
+  A network timeout or `5xx` does not mean the operation failed to execute. Do not automatically change keys, switch credentials, or submit through another route.
+</Warning>
+
+## Unknown redemption results
+
+`REDEEM_RESULT_UNKNOWN` returns HTTP `409`. The API does not resubmit a redemption request when its result is unknown. Refresh redeemable positions and confirm what happened before taking further action.
+
+An `accepted` response confirms receipt of the request, not an on-chain transaction. The API cannot guarantee deduplication across different credentials, expired records, interrupted processes, or requests sent through another redemption entry point.
+
+## Unavailable results
+
+Configuration and redemption actions can return HTTP `503` with `ORDER_RESULT_UNKNOWN`. In this case, the operation remains blocked. That code does not imply there is an order ID or `business_request_id` for those actions.
+
+Keep the original key and request, log `request_id`, and contact PolyCop to confirm the outcome. Retrying the same blocked operation does not execute it again.
+
+## Recover a withdrawal
+
+Partner user keys cannot create withdrawals. For an eligible account's withdrawal with an unknown response:
+
+1. Call `GET /wallet/withdrawals/by-key` with the original `Idempotency-Key` header and fresh HMAC authentication. This requires `wallet:read`, not another 2FA code.
+2. If you have a `withdraw_id`, you can also read `GET /wallet/withdrawals/{withdraw_id}`.
+3. Check the stored status before taking further action. Recovery responses use `Cache-Control: no-store`.
+
+A recovery `404` does not prove that the original request was not executed; older records may lack the key association. Do not automatically submit under a new key. For an order with an unknown outcome, preserve the original key and any returned `business_request_id` for reconciliation; that business reference is not an exchange order ID.
+
+See [Signing examples](/examples/signing) for helpers that send the idempotency header while signing the exact body bytes.
+
+For user-key issuance, a cached response retains its original secret and `expires_at`. Replaying it never renews a key or changes the deadline. If the user key has expired, issue a replacement as a separate operation. An expired parent fails authentication before the server can return a cached result.
+
+Older cached issuance responses may omit `expires_at`, but those keys still expire. Confirm the deadline with the issuer or request a replacement key. Keep the original idempotency record rather than discarding it to force a new response.
