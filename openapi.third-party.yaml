@@ -379,7 +379,7 @@ paths:
       description: |-
         Required scope: `wallet:read`.
 
-        Returns the current withdrawal status for the authenticated account using the original Idempotency-Key. This query does not submit a withdrawal or require a 2FA code. All responses use Cache-Control: no-store.
+        Returns the current withdrawal status for the authenticated account using the original Idempotency-Key. This query does not submit a withdrawal or require a 2FA code. Successful recovery responses include Cache-Control: no-store. Error responses may omit this header. Do not cache recovery results.
         Older withdrawals may not be found by Idempotency-Key. A 404 does not prove that a previous request was not executed; confirm its outcome before starting another withdrawal. See [withdrawal recovery](/concepts/idempotency#recover-a-withdrawal).
       operationId: getWithdrawalByKey
       security:
@@ -4030,7 +4030,9 @@ components:
             `"0"` keeps the current value and `"-1"` resets it to `"0"`.
         limit_price:
           type: string
-          description: Limit order price when `limit_order_copy=1`. Decimal string.
+          description: Order price used when the strategy is in limit-order mode.
+            Decimal string. On PATCH, `limit_order_copy=1` toggles the mode rather
+            than selecting a final state; see [AFK updates](/concepts/api-parity#afk-updates).
             On PATCH, `"0"` keeps the current value and `"-1"` resets it to `"0"`.
             Omitting this field also keeps its current value.
         order_expired_ttl_seconds:
@@ -4604,8 +4606,9 @@ components:
             type: integer
             minimum: 0
         X-RateLimit-Reset:
-          description: Seconds until the request limit is expected to allow another
-            request.
+          description: Seconds until a request subject to this limit is expected to
+            be allowed. This is a relative delay, not a Unix timestamp or a full quota
+            reset.
           schema:
             type: integer
             minimum: 1

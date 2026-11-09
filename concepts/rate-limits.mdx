@@ -75,7 +75,7 @@ When a request exceeds a limit, the API returns HTTP `429` with `code=RATE_LIMIT
 | `Retry-After` | Seconds to wait before retrying |
 | `X-RateLimit-Limit` | The request limit that was exceeded |
 | `X-RateLimit-Remaining` | Remaining requests in the current window, usually `0` |
-| `X-RateLimit-Reset` | Seconds until the current request limit resets |
+| `X-RateLimit-Reset` | Seconds until a request subject to this limit is expected to be allowed; a relative delay, not a Unix timestamp or a full quota reset |
 
 Use `Retry-After` when present. If it is absent, use exponential backoff with jitter; do not retry immediately. On every retry, read the current timestamp, generate a new nonce, and recompute the signature. For a repeated write, keep the original API key, `Idempotency-Key`, and request body. See [Idempotency](/concepts/idempotency) for each operation’s deduplication scope.
 

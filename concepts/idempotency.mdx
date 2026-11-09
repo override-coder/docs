@@ -70,7 +70,7 @@ Partner user keys cannot create withdrawals. For an eligible account's withdrawa
 
 1. Call `GET /wallet/withdrawals/by-key` with the original `Idempotency-Key` header and fresh HMAC authentication. This requires `wallet:read`, not another 2FA code.
 2. If you have a `withdraw_id`, you can also read `GET /wallet/withdrawals/{withdraw_id}`.
-3. Check the stored status before taking further action. Recovery responses use `Cache-Control: no-store`.
+3. Check the stored status before taking further action. Successful responses from `GET /wallet/withdrawals/by-key` include `Cache-Control: no-store`. Error responses may omit this header. Do not cache recovery results.
 
 A recovery `404` does not prove that the original request was not executed; older withdrawals may not be found by `Idempotency-Key`. Do not automatically submit under a new `Idempotency-Key`.
 

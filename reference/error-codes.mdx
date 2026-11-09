@@ -137,7 +137,7 @@ When you exceed a rate limit, the server returns HTTP `429` with the code `RATE_
 | `Retry-After` | Number of seconds you must wait before sending another request |
 | `X-RateLimit-Limit` | The request limit that was exceeded |
 | `X-RateLimit-Remaining` | Remaining requests in the current window (typically `0` on a 429 response) |
-| `X-RateLimit-Reset` | Seconds until the current request limit resets |
+| `X-RateLimit-Reset` | Seconds until a request subject to this limit is expected to be allowed; a relative delay, not a Unix timestamp or a full quota reset |
 
 <Note>
   The withdrawal creation endpoint (`POST /wallet/withdraw`) has a dedicated rate

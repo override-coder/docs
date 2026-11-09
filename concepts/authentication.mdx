@@ -19,8 +19,8 @@ Send these four headers on every request:
 </ParamField>
 
 <ParamField header="X-Nonce" type="string" required>
-  A random string unique for each request under the same API key. Use at least
-  16 random bytes, hex encoded.
+  A fresh, cryptographically random string for each request under the same API key.
+  Use a UUID v4 or encode at least 16 random bytes as lowercase hex.
 </ParamField>
 
 <ParamField header="X-Signature" type="string" required>
@@ -64,6 +64,8 @@ X-Signature = HMAC-SHA256(secret_key, canonical_string).hex()
 </Note>
 
 ## Canonical string examples
+
+The timestamps and nonces below are fixed examples that show the string format. For actual requests, use the current timestamp and generate a fresh nonce; do not reuse these example values.
 
 ### GET request with no body or query string
 
@@ -122,12 +124,7 @@ A nonce ("number used once") prevents an attacker who intercepts a valid request
 
 - Use a unique nonce for each request under the same API key. Changing `X-Timestamp` does not let you reuse a nonce.
 - Replaying a nonce during its retention period is rejected with HTTP `409` and `API_KEY_NONCE_REPLAYED`.
-- Generate nonces using a cryptographically secure random source. For example, use 16 or more random bytes encoded as a lowercase hex string. This produces a string of at least 32 characters.
-
-<Tip>
-  You can use a UUID v4 as a nonce. It provides the required randomness and is
-  easy to find in logs.
-</Tip>
+- Generate nonces using a cryptographically secure random source. Recommended options are a UUID v4 or 16 or more random bytes encoded as lowercase hex. The hex option produces at least 32 characters.
 
 ## Retry behaviour
 
@@ -172,9 +169,13 @@ Each API key has scopes that control which endpoints it can call. If the key doe
 | `settings:read` | Read auto-claim settings |
 | `settings:manage` | Update auto-claim settings |
 | `copytrade:read` | Read copytrade configs and records |
-| `copytrade:manage` | Create, update, and delete copytrade configs |
+| `copytrade:manage` | Create, update, and disable copytrade configs; manage keywords and market-type filters |
 | `afk:read` | Read AFK strategies and records |
 | `afk:manage` | Create and update AFK strategies |
+| `partner:users:manage` | Create or retrieve Partner users and list them |
+| `partner:api_keys:manage` | Issue and revoke Partner user keys |
+
+The two Partner management scopes require a Partner Key. See [Partner key requirements](/concepts/partner-api#partner-key-requirements) for the management endpoints.
 
 <Note>
   Creating a withdrawal also requires a valid 2FA code in the request body. Withdrawal status and recovery queries require `wallet:read` and no 2FA code. Use your

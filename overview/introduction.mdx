@@ -38,7 +38,7 @@ API JSON responses use this envelope for success and errors. Check `code` first,
 ```
 
 <ResponseField name="code" type="string" required>
-  A machine-readable status code. `OK` means the request succeeded. Any other value is an error, such as `UNAUTHORIZED` or `NOT_FOUND`.
+  A machine-readable status code. `OK` means the API call succeeded; it does not by itself confirm an order fill, withdrawal confirmation, or completed redemption. Follow the endpoint’s status and query instructions to determine the business outcome. Any other value is an error, such as `UNAUTHORIZED` or `NOT_FOUND`.
 </ResponseField>
 
 <ResponseField name="message" type="string" required>
