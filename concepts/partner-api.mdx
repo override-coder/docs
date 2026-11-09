@@ -8,6 +8,14 @@ Use a Partner Key on your backend to create users and issue their API keys. Use 
 
 All paths below are relative to `/openapi/v1`. Sign every request using [HMAC-SHA256](/concepts/authentication).
 
+## Key types
+
+- A **direct account key** accesses the account for which it was issued.
+- A **Partner Key** manages Partner users and their keys. New Partner Keys have management scopes only; see [older keys](#compatibility-with-older-keys) for legacy trading permissions.
+- A **Partner user key** accesses one provisioned user's account. It cannot create withdrawals.
+
+In this guide, “user key” means a Partner user key.
+
 ## Partner key requirements
 
 PolyCop issues Partner Keys to approved partners. Keep the key and secret on your backend.
@@ -86,7 +94,7 @@ The readiness response checks the account state and the current key's scopes and
 
 You can run this flow in your own Telegram bot. Map each authenticated Telegram user to a stable `external_user_id` in your system, and keep Partner and user credentials on your backend. Opening a bot link does not grant API access or connect an existing account.
 
-You can use your own Telegram bot for this flow. These endpoints create Partner user accounts; they do not connect an existing PolyCop account or wallet.
+These endpoints create Partner user accounts; they do not connect an existing PolyCop account or wallet.
 
 ## List and manage users
 
@@ -98,11 +106,11 @@ Revoke a user key with:
 DELETE /partner/users/{user_account_id}/api-keys/{key_id}
 ```
 
-You can revoke only user keys issued by your partner account. This endpoint cannot revoke another partner's keys or direct user keys.
+You can revoke only user keys issued by your partner account. This endpoint cannot revoke another partner's keys or direct account keys.
 
 ## Withdrawal boundary
 
-Partner user keys cannot withdraw, even if the account has 2FA. Withdrawal endpoints in the API reference apply to eligible non-user keys with `withdraw:create` and account-level 2FA. Telegram accounts are also currently blocked from withdrawal. Keep withdrawals disabled for Partner users, even though the API reference lists withdrawal endpoints.
+Partner user keys cannot withdraw, even if the account has 2FA. Withdrawal creation is available to eligible direct account keys and legacy Partner Keys with `withdraw:create` and account-level 2FA. Telegram accounts are also currently blocked from withdrawal. Keep withdrawals disabled for Partner users, even though the API reference lists withdrawal endpoints.
 
 ## Key permissions
 

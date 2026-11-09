@@ -12,6 +12,8 @@ The examples below sign a `GET /wallet` request in TypeScript, Python, and Bash.
 
 Use native `fetch` to send the request with all four authentication headers.
 
+The `res.json()` call below is suitable for this wallet example. If you reuse the helper for responses containing integer IDs larger than `Number.MAX_SAFE_INTEGER`, such as AFK record `strategy_id`, read the response as text and use a lossless JSON parser. Store those IDs as decimal strings or `bigint`; converting an already-rounded JavaScript number cannot recover the original ID.
+
 ```typescript
 import crypto from 'crypto';
 

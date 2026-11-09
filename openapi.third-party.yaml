@@ -8,7 +8,7 @@ info:
     Public third-party API for PolyCop, authenticated with API key and HMAC-SHA256.
     Partner keys provision users and issue user keys; use each user's key for their trading requests.
     Custodial wallets only. Partner user keys cannot withdraw or use wildcard scopes.
-    Eligible non-user keys require account-level 2FA for Polygon withdrawals.
+    Eligible direct account keys and legacy Partner Keys require withdraw:create and account-level 2FA to create Polygon withdrawals.
     This is not a Polymarket CLOB-compatible API.
     Global, source IP, and endpoint limits also apply to unauthenticated requests; 429 does not confirm valid credentials.
 servers:
@@ -212,7 +212,7 @@ paths:
       description: Requires a partner API key with `partner:api_keys:manage` scope.
         Legacy Partner Keys may use `*`; new keys reject wildcard scopes. Only revokes
         user API keys created by the authenticated partner for the specified `user_account_id`;
-        it cannot revoke another partner's keys or direct user keys.
+        it cannot revoke another partner's keys or direct account keys.
       security:
       - ApiKeyAuth: []
         ApiTimestamp: []
@@ -1319,6 +1319,7 @@ paths:
         Updates an AFK strategy. For limit_order_copy, use_kdj, use_macd, and use_atr, `1` toggles the current setting; `0` or omission leaves it unchanged. Each new update operation with `1` toggles the setting again. Retry the same operation with the original Idempotency-Key and body.
         For time_start_sec and time_end_sec, omission or `0` keeps the current value; `-1` resets it to `0`. A reset start permits entry from the beginning of each round; a reset end uses the end of the round.
         A successful response acknowledges the update. Its data is not a snapshot of the final configuration. Call GET /afk/strategies/{strategy_id} after updating to read the resulting settings.
+        PATCH requires market, side, and buy_amount, even when changing another field. For the numeric fields listed in [AFK updates](/concepts/api-parity#afk-updates), zero keeps the current value and minus one resets it to zero; use JSON strings for decimal fields. Do not treat these values as a general rule for all fields.
       operationId: updateAFKStrategy
       parameters:
       - "$ref": "#/components/parameters/RequiredActionIdempotencyKey"
@@ -1983,8 +1984,9 @@ components:
         refresh HMAC signing headers. After a timeout, query withdrawals/by-key with
         the original Idempotency-Key, without OTP. A different Idempotency-Key is
         a new withdrawal request. Confirm the previous outcome before creating one.
-        An old record may lack a key association; recovery 404 does not prove non-execution.
-        Ambiguous matching records return 409 and require support reconciliation.
+        Some withdrawals may not be found by Idempotency-Key; a recovery 404 does
+        not prove non-execution. Ambiguous matching records return 409 and require
+        support reconciliation.
       schema:
         type: string
         maxLength: 128
@@ -1992,10 +1994,10 @@ components:
       name: Idempotency-Key
       in: header
       required: true
-      description: Original withdrawal request key. Querying never executes a withdrawal
-        or consumes OTP. A 404 is not proof that an earlier request was not executed,
-        including historical unmapped records; never generate a new Idempotency-Key
-        automatically.
+      description: The original Idempotency-Key used to create the withdrawal. This
+        lookup does not submit a withdrawal or require a 2FA code. A 404 does not
+        prove that the request was not executed; confirm its outcome before starting
+        another withdrawal.
       schema:
         type: string
         minLength: 1
@@ -2510,8 +2512,8 @@ components:
           type: string
           format: date-time
           description: UTC deadline. At most 180 days after creation; reset does not
-            extend it. Present on new issuance and list responses; a pre-upgrade cached
-            issuance response may omit this field, which does not mean unlimited validity.
+            extend it. Present on new issuance and list responses; a replayed issuance
+            response may omit this field, which does not mean unlimited validity.
         last_used_at:
           type: string
           format: date-time
@@ -3652,9 +3654,8 @@ components:
           enum:
           - 1
           - 2
-          description: Use `1` for copytrade configurations in this API. The shared
-            schema also lists `2`, but template configuration writes are not supported
-            by these endpoints.
+          description: Use `1` for copytrade configurations. These endpoints do not
+            support template configuration writes (`2`).
     CopytradeConfigUpdateInput:
       type: object
       properties:
@@ -3980,7 +3981,8 @@ components:
           type: integer
           description: Configured period in seconds. The trading round duration is
             selected by market; changing period alone does not select a different
-            market duration.
+            market duration. On PATCH, `0` keeps the current value and `-1` resets
+            it to `0`. Omitting this field also keeps its current value.
         side:
           type: integer
           enum:
@@ -4001,43 +4003,68 @@ components:
         min_price:
           type: string
           description: Minimum outcome-token price allowed for entry. Decimal string.
+            On PATCH, `"0"` keeps the current value and `"-1"` resets it to `"0"`.
+            Omitting this field also keeps its current value.
         max_price:
           type: string
           description: Maximum outcome-token price allowed for entry. Decimal string.
+            On PATCH, `"0"` keeps the current value and `"-1"` resets it to `"0"`.
+            Omitting this field also keeps its current value.
         price_delta_min:
           type: string
           description: Minimum change in the underlying cryptocurrency price since
             the round opened (current price minus opening price). An absolute price
-            difference, not a percentage.
+            difference, not a percentage. On PATCH, `"0"` keeps the current value
+            and `"-1"` resets it to `"0"`. Omitting this field also keeps its current
+            value.
         price_delta_max:
           type: string
           description: Maximum change in the underlying cryptocurrency price since
             the round opened (current price minus opening price). An absolute price
-            difference, not a percentage.
+            difference, not a percentage. On PATCH, `"0"` keeps the current value
+            and `"-1"` resets it to `"0"`. Omitting this field also keeps its current
+            value.
         buy_amount:
           type: string
-          description: Buy amount per AFK order in USD. Decimal string.
+          description: Buy amount per AFK order in USD. Decimal string. On PATCH,
+            `"0"` keeps the current value and `"-1"` resets it to `"0"`.
         limit_price:
           type: string
           description: Limit order price when `limit_order_copy=1`. Decimal string.
+            On PATCH, `"0"` keeps the current value and `"-1"` resets it to `"0"`.
+            Omitting this field also keeps its current value.
         order_expired_ttl_seconds:
           type: integer
-          description: Limit order expiration TTL in seconds.
+          description: Limit order expiration TTL in seconds. On PATCH, `0` keeps
+            the current value and `-1` resets it to `0`. Omitting this field also
+            keeps its current value.
         total_rounds:
           type: integer
-          description: Maximum number of AFK trading rounds.
+          description: Trading rounds to allocate on creation. GET responses return
+            the remaining rounds, which decrease after successful order submission.
+            On PATCH, a positive value sets the remaining rounds. On PATCH, `0` keeps
+            the current value and `-1` resets it to `0`. Omitting this field also
+            keeps its current value.
         take_profit_percentage:
           type: string
-          description: Take-profit percentage trigger. Decimal string.
+          description: Take-profit percentage trigger. Decimal string. On PATCH, `"0"`
+            keeps the current value and `"-1"` resets it to `"0"`. Omitting this field
+            also keeps its current value.
         take_profit_price:
           type: string
-          description: Take-profit price trigger. Decimal string.
+          description: Take-profit price trigger. Decimal string. On PATCH, `"0"`
+            keeps the current value and `"-1"` resets it to `"0"`. Omitting this field
+            also keeps its current value.
         stop_loss_percentage:
           type: string
-          description: Stop-loss percentage trigger. Decimal string.
+          description: Stop-loss percentage trigger. Decimal string. On PATCH, `"0"`
+            keeps the current value and `"-1"` resets it to `"0"`. Omitting this field
+            also keeps its current value.
         stop_loss_price:
           type: string
-          description: Stop-loss price trigger. Decimal string.
+          description: Stop-loss price trigger. Decimal string. On PATCH, `"0"` keeps
+            the current value and `"-1"` resets it to `"0"`. Omitting this field also
+            keeps its current value.
         limit_order_copy:
           type: integer
           enum:
@@ -4049,7 +4076,8 @@ components:
         slippage:
           type: string
           description: Market order slippage percentage string, for example `2` means
-            2%.
+            2%. On PATCH, `"0"` keeps the current value and `"-1"` resets it to `"0"`.
+            Omitting this field also keeps its current value.
         use_kdj:
           type: integer
           enum:
@@ -4102,6 +4130,7 @@ components:
       description: |-
         For time_start_sec and time_end_sec on PATCH, omission or `0` keeps the existing value; `-1` resets it to `0`. A reset start permits entry from the beginning of each round; a reset end uses the end of the round.
         For limit_order_copy, use_kdj, use_macd, and use_atr, `1` toggles the current setting; `0` or omission leaves it unchanged. These inputs are commands, not desired final values. Retry the same operation with its original Idempotency-Key and body. See [AFK updates](/concepts/api-parity#afk-updates).
+        PATCH requires market, side, and buy_amount, even when changing another field. For the numeric fields listed in [AFK updates](/concepts/api-parity#afk-updates), zero keeps the current value and minus one resets it to zero; use JSON strings for decimal fields. Do not treat these values as a general rule for all fields.
     AFKRecordList:
       type: object
       required:

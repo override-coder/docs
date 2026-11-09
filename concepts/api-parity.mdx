@@ -35,8 +35,6 @@ Use the user’s API key with `copytrade:manage` for these operations. They retu
 
 The keyword's `data.code` is an advisory value, separate from the outer `code=OK`. Adding a keyword does not return a keyword ID. The public API has no keyword-list endpoint, and configuration responses do not include keyword IDs. Deletion requires an already-known `key_word_id`; these endpoints do not provide a complete flow for obtaining it.
 
-Partner user keys cannot withdraw. See [Partner API](/concepts/partner-api) for account provisioning and supported actions.
-
 ## Copytrade requests
 
 Use the user's API key when adding or deleting keywords or updating market types. These operations use the documented `/copytrade/configs/{config_id}` routes and payloads. The user's API key determines the account. A Partner Key cannot select another trading user.
@@ -56,7 +54,7 @@ The supported symbol families are `BTC`, `ETH`, `SOL`, `XRP`, `DOGE`, `BNB`, and
 
 ## AFK updates
 
-`PATCH /afk/strategies/{strategy_id}` uses different switch semantics from creation and queries:
+`PATCH /afk/strategies/{strategy_id}` requires `market`, `side`, and `buy_amount`, even when changing another field. It uses different switch semantics from creation and queries:
 
 | Field | Creation and GET responses | PATCH input |
 |---|---|---|
@@ -64,6 +62,17 @@ The supported symbol families are `BTC`, `ETH`, `SOL`, `XRP`, `DOGE`, `BNB`, and
 | `use_kdj`, `use_macd`, `use_atr` | `0`: disabled; `1`: enabled | `1`: toggle the filter; `0` or omission: keep its current state |
 
 Each new update operation with a switch set to `1` toggles that setting again. Retry the same operation with its original `Idempotency-Key` and body. For `time_start_sec` and `time_end_sec`, omission or `0` keeps the current value, while `-1` resets it to `0`.
+
+The following numeric fields also use zero to keep the current value and minus one to reset it to zero:
+
+| Fields | Keep current value | Reset to zero |
+|---|---|---|
+| `period`, `time_start_sec`, `time_end_sec`, `order_expired_ttl_seconds`, `total_rounds` | `0` | `-1` |
+| `min_price`, `max_price`, `price_delta_min`, `price_delta_max`, `buy_amount`, `limit_price`, `slippage`, `take_profit_percentage`, `take_profit_price`, `stop_loss_percentage`, `stop_loss_price` | `"0"` | `"-1"` |
+
+Omitting an optional field in this table keeps its current value. `buy_amount` remains required. These rules apply only to the listed fields.
+
+On creation, `total_rounds` sets the allocated trading rounds. GET returns the remaining rounds, which decrease after successful order submission. A positive PATCH value sets the remaining rounds; `0` does not mean unlimited rounds.
 
 A successful PATCH response acknowledges the update; its `data` is not a snapshot of the final settings. Call `GET /afk/strategies/{strategy_id}` after updating to read the resulting configuration.
 

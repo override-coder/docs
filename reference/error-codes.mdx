@@ -17,7 +17,7 @@ Check the endpoint reference for operation-specific responses.
 | `UNAUTHORIZED` | 401 | Authentication failed | Check your headers and signature |
 | `FORBIDDEN` | 403 | Key type, scope, source IP policy, or account policy denies the request | Check the key permissions and source IP; this code alone does not confirm successful signature verification |
 | `NOT_FOUND` | 404 | The requested resource does not exist | Verify the resource ID |
-| `VALIDATION_FAILED` | 400 / 422 | The request body failed schema validation | Correct the invalid body fields and retry |
+| `VALIDATION_FAILED` | 400 / 422 | Request parameters or required headers failed validation | Use `message` to identify and correct the invalid or missing input |
 | `CONFLICT` | 409 | The request conflicts with a previous operation or the current state | Check the message and current state. Preserve the original request when its result is unknown; see [Idempotency](/concepts/idempotency) |
 | `RATE_LIMITED` | 429 | Too many requests | Honor `Retry-After` when present; otherwise use exponential backoff with jitter |
 | `INTERNAL_ERROR` | 500 | Unexpected server-side error | For reads, retry with backoff; for writes, keep the original `Idempotency-Key` and confirm the outcome |

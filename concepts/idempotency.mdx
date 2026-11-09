@@ -72,9 +72,15 @@ Partner user keys cannot create withdrawals. For an eligible account's withdrawa
 2. If you have a `withdraw_id`, you can also read `GET /wallet/withdrawals/{withdraw_id}`.
 3. Check the stored status before taking further action. Recovery responses use `Cache-Control: no-store`.
 
-A recovery `404` does not prove that the original request was not executed; older withdrawals may not be found by `Idempotency-Key`. Do not automatically submit under a new `Idempotency-Key`. For an order with an unknown outcome, preserve the original `Idempotency-Key` and any returned `business_request_id` for reconciliation; that business reference is not an exchange order ID.
+A recovery `404` does not prove that the original request was not executed; older withdrawals may not be found by `Idempotency-Key`. Do not automatically submit under a new `Idempotency-Key`.
+
+## Resolve an unknown order result
+
+For an order with an unknown outcome, preserve the original `Idempotency-Key` and any returned `business_request_id` for reconciliation; that business reference is not an exchange order ID.
 
 See [Signing examples](/examples/signing) for helpers that send the idempotency header while signing the exact body bytes.
+
+## Retry user-key issuance
 
 For user-key issuance, a cached response retains its original secret and `expires_at`. Replaying it never renews a key or changes the deadline. If the user key has expired, issue a replacement as a separate operation. An expired parent fails authentication before the server can return a cached result.
 
