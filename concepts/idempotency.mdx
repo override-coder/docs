@@ -82,7 +82,11 @@ See [Signing examples](/examples/signing) for helpers that send the idempotency 
 
 ## Retry user-key issuance
 
-For user-key issuance, a cached response retains its original secret and `expires_at`. Replaying it never renews a key or changes the deadline. If the user key has expired, issue a replacement as a separate operation. An expired parent fails authentication before the server can return a cached result.
+Completed user-key issuance responses are normally available for replay for 24 hours. Retry with the same Partner Key, `Idempotency-Key`, method, path, query, and exact body. The Partner Key must still be active and authorized; generate fresh HMAC signing headers for each retry.
+
+Within that replay window, the response retains its original secret and `expires_at`. Replaying it never renews a key or changes the deadline. If the user key has expired, issue a replacement as a separate operation. An expired parent cannot retrieve the cached response.
+
+After the completed response expires, the same `Idempotency-Key` no longer guarantees replay or prevents another issuance. Confirm the original outcome before sending another issuance request. Processing or blocked requests do not execute again on retry; do not change the key or credentials to bypass an unresolved result.
 
 ### Older issuance responses
 

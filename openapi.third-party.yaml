@@ -151,10 +151,15 @@ paths:
         Legacy Partner Keys may use `*`; new keys reject wildcard scopes. The partner
         user must have `wallet_status=ready`; if it is `pending` or `failed`, retry
         create-or-get for the same `external_user_id` before creating the user API
-        key. Save the secret from the creation response securely. An idempotent replay
-        returns the original secret and expires_at without extending the deadline,
-        even if the user key has since expired. Issue a replacement as a separate
-        operation.
+        key. Save the secret from the creation response securely. Completed responses
+        are normally available for replay for 24 hours. Within that window, retry
+        with the same active, authorized Partner Key, Idempotency-Key, and request
+        to replay the original secret and expires_at without extending the deadline,
+        even if the user key has since expired. After the completed response expires,
+        the same Idempotency-Key no longer guarantees replay or prevents another issuance.
+        Confirm the original outcome before another issuance request. See [user-key
+        issuance retries](/concepts/idempotency#retry-user-key-issuance) for signing
+        requirements and unresolved results.
       security:
       - ApiKeyAuth: []
         ApiTimestamp: []
@@ -2564,6 +2569,11 @@ components:
           type: array
           items:
             "$ref": "#/components/schemas/Balance"
+          description: Account balance summary, not a complete inventory of on-chain
+            token balances. The amount represents available_trade when available;
+            otherwise it may represent account_value, which includes position value.
+            Do not treat it as a withdrawable-cash amount. Use available_trade for
+            the available trading balance and account_value for total account value.
     Network:
       type: string
       enum:
@@ -2583,6 +2593,9 @@ components:
         amount:
           type: string
           example: '100.25'
+          description: Decimal amount in the wallet balance summary. It may include
+            position value when available_trade is unavailable; it is not a guarantee
+            of withdrawable cash.
     CreateWithdrawalRequest:
       type: object
       required:

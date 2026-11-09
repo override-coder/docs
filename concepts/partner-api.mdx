@@ -134,7 +134,7 @@ Store the returned `expires_at` alongside the key. Resetting a secret does not e
 
 Revoking or rotating the parent does not change the deadline stored for its user keys.
 
-Retrying key issuance with the same `Idempotency-Key` returns the original result and `expires_at`. It does not renew an expired user key or create a new one. An expired parent cannot retrieve that cached response. Issue a replacement as a separate operation.
+Completed issuance responses are normally available for replay for 24 hours. Within that window, retry with the same Partner Key, `Idempotency-Key`, and request to obtain the original result and `expires_at`; the Partner Key must still be active and authorized. Replay does not renew the user key. Once the completed response expires, the same `Idempotency-Key` no longer guarantees replay or prevents another issuance. Confirm the original outcome first. See [user-key issuance retries](/concepts/idempotency#retry-user-key-issuance) for signing requirements and unresolved results.
 
 ## Compatibility with older keys
 

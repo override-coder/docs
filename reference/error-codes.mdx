@@ -12,7 +12,7 @@ Check the endpoint reference for operation-specific responses.
 
 | Code | HTTP | Meaning | Recommended action |
 |---|---|---|---|
-| `OK` | 200 | Request succeeded | No action |
+| `OK` | 200 | The API call succeeded | Follow the endpoint’s business status and query instructions; this alone does not confirm a fill, withdrawal confirmation, or completed redemption |
 | `BAD_REQUEST` | 400 | The request is malformed or missing required fields | Fix the request before retrying |
 | `UNAUTHORIZED` | 401 | Authentication failed | Check your headers and signature |
 | `FORBIDDEN` | 403 | Key type, scope, source IP policy, or account policy denies the request | Check the key permissions and source IP; this code alone does not confirm successful signature verification |
