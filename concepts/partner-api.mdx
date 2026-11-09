@@ -60,7 +60,7 @@ Call `POST /partner/users/{user_account_id}/api-keys` with your Partner Key. Spe
 }
 ```
 
-This request includes the scopes listed above. Add `copytrade:read`, `copytrade:manage`, `afk:read`, and `afk:manage` if your application uses those features.
+Add `copytrade:read`, `copytrade:manage`, `afk:read`, and `afk:manage` if your application uses those features.
 
 <Warning>
   Store the secret from the creation response encrypted on your backend immediately. There is no separate secret-retrieval endpoint; an idempotent retry can replay the original issuance response. Never send it to a browser, Telegram chat, or client log.

@@ -61,16 +61,30 @@ The supported symbol families are `BTC`, `ETH`, `SOL`, `XRP`, `DOGE`, `BNB`, and
 | `limit_order_copy` | `0`: market; `1`: limit | `1`: switch modes; `0` or omission: keep the current mode |
 | `use_kdj`, `use_macd`, `use_atr` | `0`: disabled; `1`: enabled | `1`: toggle the filter; `0` or omission: keep its current state |
 
-Each new update operation with a switch set to `1` toggles that setting again. Retry the same operation with its original `Idempotency-Key` and body. For `time_start_sec` and `time_end_sec`, omission or `0` keeps the current value, while `-1` resets it to `0`.
+Each new update operation with a switch set to `1` toggles that setting again. Retry the same operation with its original `Idempotency-Key` and body.
 
 The following numeric fields also use zero to keep the current value and minus one to reset it to zero:
 
+Integer fields:
+
 | Fields | Keep current value | Reset to zero |
 |---|---|---|
-| `period`, `time_start_sec`, `time_end_sec`, `order_expired_ttl_seconds`, `total_rounds` | `0` | `-1` |
-| `min_price`, `max_price`, `price_delta_min`, `price_delta_max`, `buy_amount`, `limit_price`, `slippage`, `take_profit_percentage`, `take_profit_price`, `stop_loss_percentage`, `stop_loss_price` | `"0"` | `"-1"` |
+| `time_start_sec`, `time_end_sec` | `0` | `-1` |
+| `period`, `order_expired_ttl_seconds` | `0` | `-1` |
+| `total_rounds` | `0` | `-1` |
 
-Omitting an optional field in this table keeps its current value. `buy_amount` remains required. These rules apply only to the listed fields.
+Decimal-string fields:
+
+| Fields | Keep current value | Reset to zero |
+|---|---|---|
+| `min_price`, `max_price` | `"0"` | `"-1"` |
+| `price_delta_min`, `price_delta_max` | `"0"` | `"-1"` |
+| `buy_amount`, `limit_price` | `"0"` | `"-1"` |
+| `slippage` | `"0"` | `"-1"` |
+| `take_profit_percentage`, `take_profit_price` | `"0"` | `"-1"` |
+| `stop_loss_percentage`, `stop_loss_price` | `"0"` | `"-1"` |
+
+Omitting an optional field in either table keeps its current value. `buy_amount` remains required. These rules apply only to the listed fields.
 
 On creation, `total_rounds` sets the allocated trading rounds. GET returns the remaining rounds, which decrease after successful order submission. A positive PATCH value sets the remaining rounds; `0` does not mean unlimited rounds.
 
