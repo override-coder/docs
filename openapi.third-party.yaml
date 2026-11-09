@@ -2230,8 +2230,8 @@ components:
         next_cursor:
           type: string
           nullable: true
-          description: Cursor for the next page. It is the last `user_account_id`
-            from the current page; omit it when this field is absent.
+          description: Cursor for the next page. Pass it as `cursor` in the next request.
+            Stop paginating when `next_cursor` is absent or null.
     PartnerUserListItem:
       type: object
       required:
